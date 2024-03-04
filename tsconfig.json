@@ -1,0 +1,23 @@
+{
+	"compilerOptions": {
+		"module": "CommonJS",
+		"target": "ES2022",
+		"outDir": "build",
+		"lib": [
+			"ES2022",
+			"DOM"
+		],
+		"sourceMap": true,
+		"rootDir": "src",
+		"strict": true,
+		"esModuleInterop": true
+	},
+	"exclude": [
+		"node_modules",
+		"build"
+	],
+	"include": [
+		"src"
+	],
+	"extends": "../../tsconfig",
+}
