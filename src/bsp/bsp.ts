@@ -14,9 +14,11 @@ import {
   RequestType,
   RequestType0,
   RequestHandler,
+  RequestHandler0,
   NotificationType,
   NotificationHandler,
 } from 'vscode-jsonrpc'
+import {MessageConnection} from 'vscode-jsonrpc/node'
 
 export namespace Bsp4Ts {
   export const ProtocolVersion: string = '2.2.0'
@@ -182,7 +184,7 @@ export namespace OnBuildInitialized {
 export namespace BuildShutdown {
   export const method: 'build/shutdown' = 'build/shutdown'
   export const type = new RequestType0<void, void>(method)
-  export type HandlerSignature = RequestHandler<void, void, void>
+  export type HandlerSignature = RequestHandler0<void, void>
 }
 
 export namespace OnBuildExit {
@@ -196,8 +198,7 @@ export namespace WorkspaceBuildTargets {
   export const type = new RequestType0<WorkspaceBuildTargetsResult, void>(
     method
   )
-  export type HandlerSignature = RequestHandler<
-    void,
+  export type HandlerSignature = RequestHandler0<
     WorkspaceBuildTargetsResult,
     void
   >
@@ -206,7 +207,7 @@ export namespace WorkspaceBuildTargets {
 export namespace WorkspaceReload {
   export const method: 'workspace/reload' = 'workspace/reload'
   export const type = new RequestType0<void, void>(method)
-  export type HandlerSignature = RequestHandler<void, void, void>
+  export type HandlerSignature = RequestHandler0<void, void>
 }
 
 export namespace BuildTargetSources {
@@ -369,6 +370,51 @@ export interface BuildServer {
   onRunReadStdin: OnRunReadStdin.HandlerSignature
 }
 
+export function registerBuildServerHandlers(
+  connection: MessageConnection,
+  handlers: BuildServer
+) {
+  connection.onRequest(BuildInitialize.type, handlers.buildInitialize)
+  connection.onNotification(
+    OnBuildInitialized.type,
+    handlers.onBuildInitialized
+  )
+  connection.onRequest(BuildShutdown.type, handlers.buildShutdown)
+  connection.onNotification(OnBuildExit.type, handlers.onBuildExit)
+  connection.onRequest(
+    WorkspaceBuildTargets.type,
+    handlers.workspaceBuildTargets
+  )
+  connection.onRequest(WorkspaceReload.type, handlers.workspaceReload)
+  connection.onRequest(BuildTargetSources.type, handlers.buildTargetSources)
+  connection.onRequest(
+    BuildTargetInverseSources.type,
+    handlers.buildTargetInverseSources
+  )
+  connection.onRequest(
+    BuildTargetDependencySources.type,
+    handlers.buildTargetDependencySources
+  )
+  connection.onRequest(
+    BuildTargetDependencyModules.type,
+    handlers.buildTargetDependencyModules
+  )
+  connection.onRequest(BuildTargetResources.type, handlers.buildTargetResources)
+  connection.onRequest(
+    BuildTargetOutputPaths.type,
+    handlers.buildTargetOutputPaths
+  )
+  connection.onRequest(BuildTargetCompile.type, handlers.buildTargetCompile)
+  connection.onRequest(BuildTargetRun.type, handlers.buildTargetRun)
+  connection.onRequest(BuildTargetTest.type, handlers.buildTargetTest)
+  connection.onRequest(DebugSessionStart.type, handlers.debugSessionStart)
+  connection.onRequest(
+    BuildTargetCleanCache.type,
+    handlers.buildTargetCleanCache
+  )
+  connection.onNotification(OnRunReadStdin.type, handlers.onRunReadStdin)
+}
+
 export interface ResourcesItem {
   target: BuildTargetIdentifier
   resources: string[]
@@ -502,6 +548,33 @@ export interface BuildClient {
   onBuildTaskFinish: OnBuildTaskFinish.HandlerSignature
   onRunPrintStdout: OnRunPrintStdout.HandlerSignature
   onRunPrintStderr: OnRunPrintStderr.HandlerSignature
+}
+
+export function registerBuildClientHandlers(
+  connection: MessageConnection,
+  handlers: BuildClient
+) {
+  connection.onNotification(
+    OnBuildShowMessage.type,
+    handlers.onBuildShowMessage
+  )
+  connection.onNotification(OnBuildLogMessage.type, handlers.onBuildLogMessage)
+  connection.onNotification(
+    OnBuildPublishDiagnostics.type,
+    handlers.onBuildPublishDiagnostics
+  )
+  connection.onNotification(
+    OnBuildTargetDidChange.type,
+    handlers.onBuildTargetDidChange
+  )
+  connection.onNotification(OnBuildTaskStart.type, handlers.onBuildTaskStart)
+  connection.onNotification(
+    OnBuildTaskProgress.type,
+    handlers.onBuildTaskProgress
+  )
+  connection.onNotification(OnBuildTaskFinish.type, handlers.onBuildTaskFinish)
+  connection.onNotification(OnRunPrintStdout.type, handlers.onRunPrintStdout)
+  connection.onNotification(OnRunPrintStderr.type, handlers.onRunPrintStderr)
 }
 
 export namespace BuildTargetDataKind {
@@ -878,6 +951,13 @@ export interface CancelExtension {
   cancelRequest: CancelRequest.HandlerSignature
 }
 
+export function registerCancelExtensionHandlers(
+  connection: MessageConnection,
+  handlers: CancelExtension
+) {
+  connection.onNotification(CancelRequest.type, handlers.cancelRequest)
+}
+
 export interface SetCargoFeaturesResult {
   statusCode: StatusCode
 }
@@ -903,8 +983,7 @@ export namespace CargoFeaturesState {
   export const method: 'workspace/cargoFeaturesState' =
     'workspace/cargoFeaturesState'
   export const type = new RequestType0<CargoFeaturesStateResult, void>(method)
-  export type HandlerSignature = RequestHandler<
-    void,
+  export type HandlerSignature = RequestHandler0<
     CargoFeaturesStateResult,
     void
   >
@@ -928,6 +1007,14 @@ export namespace SetCargoFeatures {
 export interface CargoBuildServer {
   cargoFeaturesState: CargoFeaturesState.HandlerSignature
   setCargoFeatures: SetCargoFeatures.HandlerSignature
+}
+
+export function registerCargoBuildServerHandlers(
+  connection: MessageConnection,
+  handlers: CargoBuildServer
+) {
+  connection.onRequest(CargoFeaturesState.type, handlers.cargoFeaturesState)
+  connection.onRequest(SetCargoFeatures.type, handlers.setCargoFeatures)
 }
 
 export interface CargoFeaturesStateResult {
@@ -973,6 +1060,16 @@ export interface CppBuildServer {
   buildTargetCppOptions: BuildTargetCppOptions.HandlerSignature
 }
 
+export function registerCppBuildServerHandlers(
+  connection: MessageConnection,
+  handlers: CppBuildServer
+) {
+  connection.onRequest(
+    BuildTargetCppOptions.type,
+    handlers.buildTargetCppOptions
+  )
+}
+
 export interface JavacOptionsResult {
   items: JavacOptionsItem[]
 }
@@ -993,6 +1090,16 @@ export namespace BuildTargetJavacOptions {
 
 export interface JavaBuildServer {
   buildTargetJavacOptions: BuildTargetJavacOptions.HandlerSignature
+}
+
+export function registerJavaBuildServerHandlers(
+  connection: MessageConnection,
+  handlers: JavaBuildServer
+) {
+  connection.onRequest(
+    BuildTargetJavacOptions.type,
+    handlers.buildTargetJavacOptions
+  )
 }
 
 export interface JavacOptionsItem {
@@ -1043,6 +1150,20 @@ export namespace BuildTargetJvmRunEnvironment {
 export interface JvmBuildServer {
   buildTargetJvmTestEnvironment: BuildTargetJvmTestEnvironment.HandlerSignature
   buildTargetJvmRunEnvironment: BuildTargetJvmRunEnvironment.HandlerSignature
+}
+
+export function registerJvmBuildServerHandlers(
+  connection: MessageConnection,
+  handlers: JvmBuildServer
+) {
+  connection.onRequest(
+    BuildTargetJvmTestEnvironment.type,
+    handlers.buildTargetJvmTestEnvironment
+  )
+  connection.onRequest(
+    BuildTargetJvmRunEnvironment.type,
+    handlers.buildTargetJvmRunEnvironment
+  )
 }
 
 export interface JvmBuildTarget {
@@ -1118,6 +1239,16 @@ export interface PythonBuildServer {
   buildTargetPythonOptions: BuildTargetPythonOptions.HandlerSignature
 }
 
+export function registerPythonBuildServerHandlers(
+  connection: MessageConnection,
+  handlers: PythonBuildServer
+) {
+  connection.onRequest(
+    BuildTargetPythonOptions.type,
+    handlers.buildTargetPythonOptions
+  )
+}
+
 export interface PythonOptionsItem {
   target: BuildTargetIdentifier
   interpreterOptions: string[]
@@ -1191,6 +1322,13 @@ export namespace RustWorkspace {
 
 export interface RustBuildServer {
   rustWorkspace: RustWorkspace.HandlerSignature
+}
+
+export function registerRustBuildServerHandlers(
+  connection: MessageConnection,
+  handlers: RustBuildServer
+) {
+  connection.onRequest(RustWorkspace.type, handlers.rustWorkspace)
 }
 
 export namespace RustDepKind {
@@ -1373,6 +1511,24 @@ export interface ScalaBuildServer {
   buildTargetScalacOptions: BuildTargetScalacOptions.HandlerSignature
   buildTargetScalaTestClasses: BuildTargetScalaTestClasses.HandlerSignature
   buildTargetScalaMainClasses: BuildTargetScalaMainClasses.HandlerSignature
+}
+
+export function registerScalaBuildServerHandlers(
+  connection: MessageConnection,
+  handlers: ScalaBuildServer
+) {
+  connection.onRequest(
+    BuildTargetScalacOptions.type,
+    handlers.buildTargetScalacOptions
+  )
+  connection.onRequest(
+    BuildTargetScalaTestClasses.type,
+    handlers.buildTargetScalaTestClasses
+  )
+  connection.onRequest(
+    BuildTargetScalaMainClasses.type,
+    handlers.buildTargetScalaMainClasses
+  )
 }
 
 export interface ScalaMainClassesItem {
