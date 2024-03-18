@@ -4,20 +4,27 @@ import * as sinon from 'sinon'
 import cp from 'child_process'
 import {Test} from '@nestjs/testing'
 import {beforeEach, afterEach} from 'mocha'
+import * as rpc from 'vscode-jsonrpc'
+
 import {
   contextProviderFactory,
   outputChannelProvider,
 } from '../../custom-providers'
 import {BuildServerManager} from '../../rpc/server-manager'
+import {createSampleMessageConnection} from './test-utils'
 
 suite('Build Server', () => {
   let ctx: vscode.ExtensionContext
   let buildServer: BuildServerManager
   let spawnStub: sinon.SinonStub
+  let sampleConn: rpc.MessageConnection
 
   beforeEach(async () => {
     let process = cp.spawn('echo', ['hello'])
     spawnStub = sinon.stub(cp, 'spawn').returns(process)
+
+    sampleConn = createSampleMessageConnection()
+    sinon.stub(rpc, 'createMessageConnection').returns(sampleConn)
 
     ctx = {subscriptions: []} as unknown as vscode.ExtensionContext
     const moduleRef = await Test.createTestingModule({
@@ -44,9 +51,13 @@ suite('Build Server', () => {
   })
 
   test('ServerLaunch', async () => {
+    const listenStub = sinon.stub(sampleConn, 'listen')
+
     buildServer.serverLaunch()
     const conn = await buildServer.getConnection()
+
     assert.ok(spawnStub.calledOnce)
+    assert.ok(listenStub.calledOnce)
     assert.ok(conn)
   })
 

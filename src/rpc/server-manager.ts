@@ -55,7 +55,7 @@ export class BuildServerManager implements vscode.Disposable, OnModuleInit {
         new rpc.StreamMessageReader(childProcess.stdout),
         new rpc.StreamMessageWriter(childProcess.stdin)
       )
-
+      connection.listen()
       this.connectionResolve(connection)
     } catch (e) {
       this.connectionReject(e)
