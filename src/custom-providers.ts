@@ -14,7 +14,7 @@ export const contextProviderFactory = (
 
 // This custom provider creates a single primary output channel.
 // Created once at extension launch and provided anywhere this symbol is injected.
-const outputChannel = vscode.window.createOutputChannel('Bazel BSP')
+const outputChannel = vscode.window.createOutputChannel('Bazel BSP (extension)')
 export const PRIMARY_OUTPUT_CHANNEL_TOKEN = Symbol('OutputChannel')
 export const outputChannelProvider: Provider = {
   provide: PRIMARY_OUTPUT_CHANNEL_TOKEN,
