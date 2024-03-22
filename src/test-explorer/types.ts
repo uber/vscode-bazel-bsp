@@ -9,6 +9,7 @@ export enum TestItemType {
 
 export interface TestCaseInfo {
   type: TestItemType
+  languageIds?: string[]
   target?: string
   testFilters?: string[]
   resolver?: boolean

@@ -6,12 +6,13 @@ import {afterEach} from 'mocha'
 import {Deferred, Utils} from '../../utils/utils'
 
 suite('Utils Test Suite', () => {
+  const sandbox = sinon.createSandbox()
   afterEach(() => {
-    sinon.restore()
+    sandbox.restore()
   })
 
   test('getWorkspaceRoot, no workspace folders', async () => {
-    sinon.stub(vscode.workspace, 'workspaceFolders').value(undefined)
+    sandbox.stub(vscode.workspace, 'workspaceFolders').value(undefined)
 
     const result = Utils.getWorkspaceRoot()
     assert.strictEqual(result, null)
@@ -25,8 +26,10 @@ suite('Utils Test Suite', () => {
         index: 0,
       },
     ]
-    sinon.stub(vscode.workspace, 'workspaceFolders').get(() => workspaceFolders)
-    sinon.stub(vscode.workspace, 'workspaceFile').value(undefined)
+    sandbox
+      .stub(vscode.workspace, 'workspaceFolders')
+      .get(() => workspaceFolders)
+    sandbox.stub(vscode.workspace, 'workspaceFile').value(undefined)
 
     const result = Utils.getWorkspaceRoot()
     assert.strictEqual(result, workspaceFolders[0].uri)
@@ -42,8 +45,10 @@ suite('Utils Test Suite', () => {
       },
     ]
 
-    sinon.stub(vscode.workspace, 'workspaceFolders').get(() => workspaceFolders)
-    sinon
+    sandbox
+      .stub(vscode.workspace, 'workspaceFolders')
+      .get(() => workspaceFolders)
+    sandbox
       .stub(vscode.workspace, 'workspaceFile')
       .value(uri.with({path: uri.path + '/workspace.code-workspace'}))
 
