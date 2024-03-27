@@ -14,3 +14,12 @@ export interface TestCaseInfo {
   testFilters?: string[]
   resolver?: boolean
 }
+
+export enum TestCaseStatus {
+  Pending,
+  Started,
+  Passed,
+  Failed,
+  Skipped,
+  Errored,
+}

@@ -5,7 +5,7 @@ import {NestFactory} from '@nestjs/core'
 import {BuildServerManager} from './rpc/server-manager'
 import {BazelBSPBuildClient} from './test-explorer/client'
 import {TestCaseStore} from './test-explorer/store'
-import {TestRunner} from './test-explorer/runner'
+import {TestRunner} from './test-runner/runner'
 import {contextProviderFactory, outputChannelProvider} from './custom-providers'
 import {TestResolver} from './test-explorer/resolver'
 

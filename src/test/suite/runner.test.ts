@@ -11,7 +11,7 @@ import {
   contextProviderFactory,
   outputChannelProvider,
 } from '../../custom-providers'
-import {TestRunner} from '../../test-explorer/runner'
+import {TestRunner} from '../../test-runner/runner'
 
 suite('Test Runner', () => {
   let ctx: vscode.ExtensionContext
