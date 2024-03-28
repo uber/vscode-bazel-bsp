@@ -12,11 +12,11 @@ import {
   contextProviderFactory,
   outputChannelProvider,
 } from '../../custom-providers'
-import {TestItemType} from '../../test-explorer/types'
 import {createSampleMessageConnection} from './test-utils'
 import {MessageConnection} from 'vscode-jsonrpc'
 import {Utils} from '../../utils/utils'
 import * as bsp from '../../bsp/bsp'
+import {TestCaseInfo, TestItemType} from '../../test-explorer/test-info'
 
 suite('Test Resolver', () => {
   let ctx: vscode.ExtensionContext
@@ -168,7 +168,10 @@ suite('Test Resolver', () => {
         'Bazel Test Targets'
       )
       testCaseStore.testController.items.add(root)
-      testCaseStore.testCaseMetadata.set(root, {type: TestItemType.Root})
+      testCaseStore.testCaseMetadata.set(
+        root,
+        new TestCaseInfo(root, TestItemType.Root)
+      )
       assert.ok(testCaseStore.testController.resolveHandler)
 
       await testCaseStore.testController.resolveHandler(root)
@@ -195,7 +198,10 @@ suite('Test Resolver', () => {
         'Bazel Test Targets'
       )
       testCaseStore.testController.items.add(root)
-      testCaseStore.testCaseMetadata.set(root, {type: TestItemType.Root})
+      testCaseStore.testCaseMetadata.set(
+        root,
+        new TestCaseInfo(root, TestItemType.Root)
+      )
       assert.ok(testCaseStore.testController.resolveHandler)
 
       // Simulate an error in requesting targets.

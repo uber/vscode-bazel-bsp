@@ -1,24 +1,10 @@
 import * as vscode from 'vscode'
 import * as assert from 'assert'
-import {Test} from '@nestjs/testing'
 import {beforeEach, afterEach} from 'mocha'
-
-import {BazelBSPBuildClient} from '../../test-explorer/client'
-import {TestCaseStore} from '../../test-explorer/store'
-import {TestResolver} from '../../test-explorer/resolver'
-import {BuildServerManager} from '../../rpc/server-manager'
-import {
-  contextProviderFactory,
-  outputChannelProvider,
-} from '../../custom-providers'
-import {TestRunner} from '../../test-runner/runner'
-import {TestRunTracker} from '../../test-runner/run-tracker'
-import {
-  TestCaseInfo,
-  TestCaseStatus,
-  TestItemType,
-} from '../../test-explorer/types'
 import sinon from 'sinon'
+
+import {TestCaseStatus, TestRunTracker} from '../../test-runner/run-tracker'
+import {TestCaseInfo, TestItemType} from '../../test-explorer/test-info'
 
 const testStructure = [
   {
@@ -77,7 +63,7 @@ suite('Test Run Tracker', () => {
     const createTestItems = (parent: vscode.TestItem | undefined, items) => {
       items.forEach(item => {
         const testItem = testController.createTestItem(item.id, item.label)
-        metadata.set(testItem, {type: item.type})
+        metadata.set(testItem, new TestCaseInfo(testItem, item.type))
 
         createdTestItems.push(testItem)
         if (parent) {

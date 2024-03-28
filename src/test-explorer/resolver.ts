@@ -5,8 +5,8 @@ import {TestCaseStore} from './store'
 import {BazelBSPBuildClient} from './client'
 import {EXTENSION_CONTEXT_TOKEN} from '../custom-providers'
 import {BuildServerManager} from '../rpc/server-manager'
-import {TestItemType} from './types'
 import * as bsp from '../bsp/bsp'
+import {TestCaseInfo, TestItemType} from './test-info'
 
 @Injectable()
 export class TestResolver implements OnModuleInit, vscode.Disposable {
@@ -53,7 +53,10 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       'Bazel Test Targets'
     )
     newTest.canResolveChildren = true
-    this.store.testCaseMetadata.set(newTest, {type: TestItemType.Root})
+    this.store.testCaseMetadata.set(
+      newTest,
+      new TestCaseInfo(newTest, TestItemType.Root)
+    )
     this.store.testController.items.add(newTest)
   }
 
@@ -86,10 +89,10 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
           ? vscode.Uri.parse(target.baseDirectory)
           : undefined
       )
-      this.store.testCaseMetadata.set(newTest, {
-        type: TestItemType.BazelTarget,
-        languageIds: target.languageIds,
-      })
+      this.store.testCaseMetadata.set(
+        newTest,
+        new TestCaseInfo(newTest, TestItemType.BazelTarget, target.languageIds)
+      )
       updatedTestCases.push(newTest)
     })
 

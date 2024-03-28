@@ -1,11 +1,15 @@
 import * as vscode from 'vscode'
 
-import {TestCaseStore} from '../test-explorer/store'
-import {
-  TestItemType,
-  TestCaseStatus,
-  TestCaseInfo,
-} from '../test-explorer/types'
+import {TestCaseInfo, TestItemType} from '../test-explorer/test-info'
+
+export enum TestCaseStatus {
+  Pending,
+  Started,
+  Passed,
+  Failed,
+  Skipped,
+  Errored,
+}
 
 export class TestRunTracker {
   // All tests that are included in this run. See iterator definition below.
