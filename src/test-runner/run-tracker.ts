@@ -20,8 +20,8 @@ export class TestRunTracker {
 
   private request: vscode.TestRunRequest
   private testCaseMetadata: WeakMap<vscode.TestItem, TestCaseInfo>
-  private originName: string
   private run: vscode.TestRun
+  private _originName: string
 
   constructor(
     testCaseMetadata: WeakMap<vscode.TestItem, TestCaseInfo>,
@@ -34,9 +34,13 @@ export class TestRunTracker {
     this.testCaseMetadata = testCaseMetadata
     this.run = run
     this.request = request
-    this.originName = originName
+    this._originName = originName
 
     this.prepareCurrentRun()
+  }
+
+  public get originName(): string {
+    return this._originName
   }
 
   /**

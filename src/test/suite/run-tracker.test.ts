@@ -5,43 +5,7 @@ import sinon from 'sinon'
 
 import {TestCaseStatus, TestRunTracker} from '../../test-runner/run-tracker'
 import {TestCaseInfo, TestItemType} from '../../test-explorer/test-info'
-
-const testStructure = [
-  {
-    id: 'target1',
-    label: 'Target 1',
-    children: [
-      {id: 'test1_1', label: 'Test 1.1', type: TestItemType.TestCase},
-      {id: 'test1_2', label: 'Test 1.2', type: TestItemType.TestCase},
-    ],
-    type: TestItemType.BazelTarget,
-  },
-  {
-    id: 'target2',
-    label: 'Target 2',
-    children: [
-      {
-        id: 'suite2_1',
-        label: 'Suite 2.1',
-        children: [
-          {
-            id: 'test2_1_1',
-            label: 'Test 2.1.1',
-            type: TestItemType.TestCase,
-          },
-          {
-            id: 'test2_1_2',
-            label: 'Test 2.1.2',
-            type: TestItemType.TestCase,
-          },
-        ],
-        type: TestItemType.TestSuite,
-      },
-      {id: 'test2_2', label: 'Test 2.2', type: TestItemType.TestCase},
-    ],
-    type: TestItemType.BazelTarget,
-  },
-]
+import {sampleTestData} from './test-utils'
 
 suite('Test Run Tracker', () => {
   let testRunner: TestRunTracker
@@ -77,7 +41,7 @@ suite('Test Run Tracker', () => {
         }
       })
     }
-    createTestItems(undefined, testStructure)
+    createTestItems(undefined, sampleTestData)
     const request = new vscode.TestRunRequest(
       // Parent items only.
       createdTestItems.filter(item => item.parent === undefined)

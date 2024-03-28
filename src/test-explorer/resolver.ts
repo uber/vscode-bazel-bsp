@@ -91,7 +91,12 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       )
       this.store.testCaseMetadata.set(
         newTest,
-        new TestCaseInfo(newTest, TestItemType.BazelTarget, target.languageIds)
+        new TestCaseInfo(
+          newTest,
+          TestItemType.BazelTarget,
+          target.languageIds,
+          target.id
+        )
       )
       updatedTestCases.push(newTest)
     })

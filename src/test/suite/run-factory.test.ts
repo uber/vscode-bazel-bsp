@@ -12,13 +12,13 @@ import {
   outputChannelProvider,
 } from '../../custom-providers'
 import {TestRunner} from '../../test-runner/runner'
-import {populateTestCaseStore} from './test-utils'
-import {TestItem} from 'vscode'
 import {RunTrackerFactory} from '../../test-runner/run-factory'
+import {TestCaseInfo} from '../../test-explorer/test-info'
+import {populateTestCaseStore} from './test-utils'
 
-suite('Test Runner', () => {
+suite('Test Runner Factory', () => {
   let ctx: vscode.ExtensionContext
-  let testRunner: TestRunner
+  let runFactory: RunTrackerFactory
   let testCaseStore: TestCaseStore
 
   beforeEach(async () => {
@@ -36,8 +36,10 @@ suite('Test Runner', () => {
       ],
     }).compile()
     moduleRef.init()
-    testRunner = moduleRef.get(TestRunner)
     testCaseStore = moduleRef.get(TestCaseStore)
+    runFactory = moduleRef.get(RunTrackerFactory)
+
+    populateTestCaseStore(testCaseStore)
   })
 
   afterEach(() => {
@@ -46,24 +48,27 @@ suite('Test Runner', () => {
     }
   })
 
-  test('onModuleInit', async () => {
-    await testRunner.onModuleInit()
-    assert.ok(testRunner.runProfiles.get(vscode.TestRunProfileKind.Run))
-    assert.equal(ctx.subscriptions.length, 2)
-  })
-
-  test('Test Run', async () => {
-    await testRunner.onModuleInit()
-    const runProfile = testRunner.runProfiles.get(vscode.TestRunProfileKind.Run)
-    assert.ok(runProfile)
-
-    const requestedTestItems: TestItem[] = []
+  test('newRun', async () => {
+    const pendingTests: Set<vscode.TestItem> = new Set()
+    const roots: vscode.TestItem[] = []
     testCaseStore.testController.items.forEach(item => {
-      requestedTestItems.push(item)
+      // Recursively add each item and all if its children to the pending tests set.
+      const addChildren = (item: vscode.TestItem) => {
+        pendingTests.add(item)
+        item.children.forEach(child => addChildren(child))
+      }
+      addChildren(item)
+      roots.push(item)
     })
-    runProfile.runHandler(
-      {include: requestedTestItems, exclude: [], profile: runProfile},
-      new vscode.CancellationTokenSource().token
+    const runTracker = runFactory.newRun(
+      new vscode.TestRunRequest(Array.from(roots))
     )
+
+    // Confirm that the returned TestRunTracker is set up and can execute each test case.
+    assert.ok(runTracker.originName)
+    await runTracker.executeRun(async item => {
+      pendingTests.delete(item)
+    })
+    assert.equal(pendingTests.size, 0)
   })
 })

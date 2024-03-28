@@ -12,6 +12,7 @@ import {
   outputChannelProvider,
 } from '../../custom-providers'
 import {TestRunner} from '../../test-runner/runner'
+import {RunTrackerFactory} from '../../test-runner/run-factory'
 
 suite('Test Controller', () => {
   let ctx: vscode.ExtensionContext
@@ -28,6 +29,7 @@ suite('Test Controller', () => {
         BuildServerManager,
         TestResolver,
         TestRunner,
+        RunTrackerFactory,
       ],
     }).compile()
     moduleRef.init()
