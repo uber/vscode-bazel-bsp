@@ -1,6 +1,8 @@
 import * as vscode from 'vscode'
 
 import {TestCaseInfo, TestItemType} from '../test-explorer/test-info'
+import {LogMessageParams} from '../bsp/bsp'
+import {TaskOriginHandlers} from '../test-explorer/client'
 
 export enum TestCaseStatus {
   Pending,
@@ -11,7 +13,7 @@ export enum TestCaseStatus {
   Errored,
 }
 
-export class TestRunTracker {
+export class TestRunTracker implements TaskOriginHandlers {
   // All tests that are included in this run. See iterator definition below.
   private allTests: Map<TestItemType, vscode.TestItem[]>
 
@@ -22,6 +24,7 @@ export class TestRunTracker {
   private testCaseMetadata: WeakMap<vscode.TestItem, TestCaseInfo>
   private run: vscode.TestRun
   private _originName: string
+  private onDoneCallback: () => void
 
   constructor(
     testCaseMetadata: WeakMap<vscode.TestItem, TestCaseInfo>,
@@ -69,6 +72,7 @@ export class TestRunTracker {
       }
     }
     this.run.end()
+    if (this.onDoneCallback) this.onDoneCallback()
   }
 
   /**
@@ -101,6 +105,27 @@ export class TestRunTracker {
         this.run.skipped(item)
         break
     }
+  }
+
+  /**
+   * Appends a log message to this tracker's test run output.
+   * @param params Log message to be appended.
+   */
+  public onBuildLogMessage(params: LogMessageParams) {
+    if (params.message.endsWith('\\')) {
+      // Combine messages that are continued on the following line.
+      this.run.appendOutput(params.message.slice(0, -1))
+    } else {
+      this.run.appendOutput(params.message)
+      this.run.appendOutput('\n\r')
+    }
+  }
+
+  /**
+   * Registers a callback that will be called after the last test item in the run has been processed.
+   */
+  public onDone(callback: () => void) {
+    this.onDoneCallback = callback
   }
 
   /**

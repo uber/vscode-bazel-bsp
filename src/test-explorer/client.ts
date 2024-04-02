@@ -9,6 +9,14 @@ const pkg = require('../../package.json')
 
 const SUPPORTED_LANGUAGES = ['java', 'scala', 'kotlin', 'python']
 
+/**
+ * To intercept notifications from a specific originId, define custom handlers using this interface.
+ * Use registerOriginHandlers and disposeOriginHandlers to manage their lifecycle.
+ */
+export type TaskOriginHandlers = {
+  onBuildLogMessage?: (params: bsp.LogMessageParams) => void
+}
+
 @Injectable()
 export class BazelBSPBuildClient
   implements bsp.BuildClient, OnModuleInit, vscode.Disposable
@@ -19,6 +27,7 @@ export class BazelBSPBuildClient
   private initializeResult: Deferred<bsp.InitializeBuildResult> = new Deferred()
   private clientOutputChannel: vscode.LogOutputChannel =
     vscode.window.createOutputChannel('Bazel BSP (client)', {log: true})
+  private originHandlers: Map<string, TaskOriginHandlers> = new Map()
 
   async onModuleInit() {
     this.ctx.subscriptions.push(this)
@@ -35,9 +44,24 @@ export class BazelBSPBuildClient
     return this.initializeResult.promise
   }
 
-  // Use "Developer -> Set log level..." to control the level of logging that will be displayed.
-  // TODO(IDE-958): Other classes will be able to register a buffer to collect output from their own tasks.
-  // Params includes origin id, which can be used to identify a destination for the output.
+  /**
+   * Register a TaskOriginHandlers implementation to be used for all notifications that match the originId.
+   * Notifications will be redirected to the corresponding method of the registered handler.
+   * If a method is unset, default behavior defined in the build client will be used.
+   * @param originId value for which the registered handlers will be used.
+   * @param handlers implementation that will be used instead of the default behavior.
+   */
+  registerOriginHandlers(originId: string, handlers: TaskOriginHandlers): void {
+    this.originHandlers.set(originId, handlers)
+  }
+
+  /**
+   * Clean up handlers for a given originId.
+   * @param originId value for which the registered handlers will be removed.
+   */
+  disposeOriginHandlers(originId: string): void {
+    this.originHandlers.delete(originId)
+  }
 
   onBuildShowMessage(params: bsp.ShowMessageParams): void {
     switch (params.type) {
@@ -57,6 +81,16 @@ export class BazelBSPBuildClient
   }
 
   onBuildLogMessage(params: bsp.LogMessageParams): void {
+    if (params.originId) {
+      // Intercept if a custom handler is registered for this origidId and method.
+      const handler = this.originHandlers.get(params.originId)
+      if (handler && handler.onBuildLogMessage) {
+        handler.onBuildLogMessage(params)
+        return
+      }
+    }
+
+    // Use "Developer -> Set log level..." to control the level of logging that will be displayed.
     switch (params.type) {
       case bsp.MessageType.Error:
         this.clientOutputChannel.error(params.message)

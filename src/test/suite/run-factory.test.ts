@@ -15,11 +15,15 @@ import {TestRunner} from '../../test-runner/runner'
 import {RunTrackerFactory} from '../../test-runner/run-factory'
 import {TestCaseInfo} from '../../test-explorer/test-info'
 import {populateTestCaseStore} from './test-utils'
+import sinon from 'sinon'
 
 suite('Test Runner Factory', () => {
   let ctx: vscode.ExtensionContext
   let runFactory: RunTrackerFactory
   let testCaseStore: TestCaseStore
+  let buildClient: BazelBSPBuildClient
+
+  const sandbox = sinon.createSandbox()
 
   beforeEach(async () => {
     ctx = {subscriptions: []} as unknown as vscode.ExtensionContext
@@ -37,18 +41,29 @@ suite('Test Runner Factory', () => {
     }).compile()
     moduleRef.init()
     testCaseStore = moduleRef.get(TestCaseStore)
+    buildClient = moduleRef.get(BazelBSPBuildClient)
     runFactory = moduleRef.get(RunTrackerFactory)
 
     populateTestCaseStore(testCaseStore)
   })
 
   afterEach(() => {
+    sandbox.reset()
     for (const item of ctx.subscriptions) {
       item.dispose()
     }
   })
 
   test('newRun', async () => {
+    const registerHandlersStub = sandbox.stub(
+      buildClient,
+      'registerOriginHandlers'
+    )
+    const disposeHandlersStub = sandbox.stub(
+      buildClient,
+      'disposeOriginHandlers'
+    )
+
     const pendingTests: Set<vscode.TestItem> = new Set()
     const roots: vscode.TestItem[] = []
     testCaseStore.testController.items.forEach(item => {
@@ -70,5 +85,9 @@ suite('Test Runner Factory', () => {
       pendingTests.delete(item)
     })
     assert.equal(pendingTests.size, 0)
+    assert.ok(registerHandlersStub.calledOnce)
+    assert.equal(registerHandlersStub.firstCall.args[0], runTracker.originName)
+    assert.equal(registerHandlersStub.firstCall.args[1], runTracker)
+    assert.ok(disposeHandlersStub.calledOnce)
   })
 })

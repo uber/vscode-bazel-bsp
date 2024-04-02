@@ -11,6 +11,11 @@ export class RunTrackerFactory {
   @Inject(TestCaseStore) private readonly testCaseStore: TestCaseStore
   @Inject(BazelBSPBuildClient) private readonly buildClient: BazelBSPBuildClient
 
+  /**
+   * Creates a new test run tracker, and register it with the build client.
+   * @param request The test run request which will be used to populate a TestRunTracker.
+   * @returns TestRunTracker populated for this run.
+   */
   public newRun(request: TestRunRequest): TestRunTracker {
     const originId = randomUUID()
     const run = this.testCaseStore.testController.createTestRun(request)
@@ -21,6 +26,10 @@ export class RunTrackerFactory {
       originId
     )
 
+    this.buildClient.registerOriginHandlers(originId, requestTracker)
+    requestTracker.onDone(() =>
+      this.buildClient.disposeOriginHandlers(originId)
+    )
     return requestTracker
   }
 }

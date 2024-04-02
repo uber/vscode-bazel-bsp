@@ -6,6 +6,7 @@ import sinon from 'sinon'
 import {TestCaseStatus, TestRunTracker} from '../../test-runner/run-tracker'
 import {TestCaseInfo, TestItemType} from '../../test-explorer/test-info'
 import {sampleTestData} from './test-utils'
+import {LogMessageParams, MessageType} from '../../bsp/bsp'
 
 suite('Test Run Tracker', () => {
   let testRunner: TestRunTracker
@@ -161,5 +162,39 @@ suite('Test Run Tracker', () => {
 
     assert.equal(runSpy.skipped.callCount, 1)
     assert.equal(runSpy.skipped.getCall(0).args[0], testItem)
+  })
+
+  test('log message', async () => {
+    const sampleMessages: LogMessageParams[] = [
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'sample log message',
+      },
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'sample log message2\\',
+      },
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'sample log message3\\',
+      },
+    ]
+
+    for (const params of sampleMessages) {
+      testRunner.onBuildLogMessage(params)
+    }
+
+    // Call for each message plus one newline sequence.
+    assert.equal(runSpy.appendOutput.callCount, 4)
+    // Only one newline sequence is present among the calls.
+    assert.equal(
+      runSpy.appendOutput
+        .getCalls()
+        .filter(call => call.args[0].includes('\n\r')).length,
+      1
+    )
   })
 })

@@ -125,6 +125,7 @@ suite('Build Client', () => {
   })
 
   test('onBuildLogMessage', async () => {
+    const sampleOriginId = 'myTask'
     const sampleParams: bsp.LogMessageParams[] = [
       {
         type: bsp.MessageType.Error,
@@ -162,7 +163,25 @@ suite('Build Client', () => {
         task: {id: 'Sample task 2'},
         originId: '666',
       },
+      {
+        type: bsp.MessageType.Error,
+        message: 'ghi',
+        task: {id: 'Sample task 4'},
+        originId: sampleOriginId,
+      },
+      {
+        type: bsp.MessageType.Warning,
+        message: 'jkl',
+        task: {id: 'Sample task 2'},
+        originId: sampleOriginId,
+      },
     ]
+
+    const handlers = {
+      onBuildLogMessage: () => {},
+    }
+    const sampleCallbackStub = sandbox.stub(handlers, 'onBuildLogMessage')
+    buildClient.registerOriginHandlers('myTask', handlers)
 
     const errorStub = sandbox.stub(clientOutputChannel, 'error')
     const warnStub = sandbox.stub(clientOutputChannel, 'warn')
@@ -174,7 +193,9 @@ suite('Build Client', () => {
 
     // Check that each method has been called for the correct set of messages.
     const errorParams = sampleParams.filter(
-      params => params.type === bsp.MessageType.Error
+      params =>
+        params.type === bsp.MessageType.Error &&
+        params.originId !== sampleOriginId
     )
     assert.equal(errorStub.callCount, errorParams.length)
     errorParams.forEach(params => {
@@ -182,7 +203,9 @@ suite('Build Client', () => {
     })
 
     const warnParams = sampleParams.filter(
-      params => params.type === bsp.MessageType.Error
+      params =>
+        params.type === bsp.MessageType.Error &&
+        params.originId !== sampleOriginId
     )
     assert.equal(warnStub.callCount, warnParams.length)
     warnParams.forEach(params => {
@@ -191,13 +214,17 @@ suite('Build Client', () => {
 
     const infoParams = sampleParams.filter(
       params =>
-        params.type === bsp.MessageType.Info ||
-        params.type === bsp.MessageType.Log
+        (params.type === bsp.MessageType.Info ||
+          params.type === bsp.MessageType.Log) &&
+        params.originId !== sampleOriginId
     )
     assert.equal(infoStub.callCount, infoParams.length)
     infoParams.forEach(params => {
       infoStub.calledWith(params.message)
     })
+
+    // Applicable output redirected to the callback.
+    assert.equal(sampleCallbackStub.callCount, 2)
   })
 
   test('onBuildShowMessage', async () => {
