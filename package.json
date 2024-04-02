@@ -3,7 +3,7 @@
   "displayName": "vscode-bazel-bsp",
   "description": "Bazel BSP integration for VS Code.",
   "version": "0.0.1",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "repository": "https://github.com/uber/vscode-bazel-bsp",
   "engines": {
     "vscode": "^1.86.0"
