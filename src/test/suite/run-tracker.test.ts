@@ -14,6 +14,7 @@ suite('Test Run Tracker', () => {
   let createdTestItems: vscode.TestItem[]
   let metadata: WeakMap<vscode.TestItem, TestCaseInfo>
   let runSpy: sinon.SinonSpiedInstance<vscode.TestRun>
+  let cancelTokenSource: vscode.CancellationTokenSource
 
   const sandbox = sinon.createSandbox()
 
@@ -48,9 +49,17 @@ suite('Test Run Tracker', () => {
       createdTestItems.filter(item => item.parent === undefined)
     )
 
+    cancelTokenSource = new vscode.CancellationTokenSource()
+
     const run = testController.createTestRun(request)
     runSpy = sandbox.spy(run)
-    testRunner = new TestRunTracker(metadata, run, request, 'sample')
+    testRunner = new TestRunTracker(
+      metadata,
+      run,
+      request,
+      'sample',
+      cancelTokenSource.token
+    )
   })
 
   afterEach(() => {
@@ -70,6 +79,28 @@ suite('Test Run Tracker', () => {
     assert.equal(runSpy.enqueued.callCount, createdTestItems.length)
     assert.equal(runSpy.started.callCount, createdTestItems.length)
     assert.equal(runSpy.passed.callCount, createdTestItems.length)
+  })
+
+  test('execute with cancellation', async () => {
+    const remainingItems = new Set(createdTestItems)
+
+    const runItemCount = 4
+    let count = 0
+    await testRunner.executeRun(async (item, cancelToken) => {
+      testRunner.updateStatus(item, TestCaseStatus.Passed)
+      remainingItems.delete(item)
+      if (count === runItemCount - 1) {
+        // Simulate cancellation after running first 4 items
+        cancelTokenSource.cancel()
+      }
+      count++
+    })
+
+    // Items stop executing after the point of cancellation.
+    assert.equal(remainingItems.size, runItemCount)
+    assert.equal(runSpy.enqueued.callCount, createdTestItems.length)
+    assert.equal(runSpy.started.callCount, runItemCount)
+    assert.equal(runSpy.passed.callCount, runItemCount)
   })
 
   test('execute parent that updates children', async () => {
@@ -129,7 +160,13 @@ suite('Test Run Tracker', () => {
   test('execute run with empty request', async () => {
     const request = new vscode.TestRunRequest([])
     const run = testController.createTestRun(request)
-    const emptyTestRunner = new TestRunTracker(metadata, run, request, 'sample')
+    const emptyTestRunner = new TestRunTracker(
+      metadata,
+      run,
+      request,
+      'sample',
+      cancelTokenSource.token
+    )
 
     await emptyTestRunner.executeRun(async item => {
       assert.fail('Callback should not be called')

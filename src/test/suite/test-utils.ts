@@ -3,6 +3,7 @@ import {Writable, Readable} from 'stream'
 import * as rpc from 'vscode-jsonrpc/node'
 import {TestCaseStore} from '../../test-explorer/store'
 import {TestCaseInfo, TestItemType} from '../../test-explorer/test-info'
+import {BuildTargetIdentifier} from '../../bsp/bsp'
 
 /**
  * Creates a sample MessageConnection instance bound to no-op read/write streams.
@@ -62,9 +63,11 @@ export function populateTestCaseStore(store: TestCaseStore) {
   const createTestItems = (parent: vscode.TestItem | undefined, items) => {
     items.forEach(item => {
       const testItem = store.testController.createTestItem(item.id, item.label)
+      const target: BuildTargetIdentifier | undefined =
+        item.type === TestItemType.BazelTarget ? {uri: item.id} : undefined
       store.testCaseMetadata.set(
         testItem,
-        new TestCaseInfo(testItem, item.type)
+        new TestCaseInfo(testItem, item.type, [], target)
       )
 
       if (parent) {

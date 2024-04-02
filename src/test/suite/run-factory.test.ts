@@ -66,6 +66,8 @@ suite('Test Runner Factory', () => {
 
     const pendingTests: Set<vscode.TestItem> = new Set()
     const roots: vscode.TestItem[] = []
+
+    const sampleToken = new vscode.CancellationTokenSource().token
     testCaseStore.testController.items.forEach(item => {
       // Recursively add each item and all if its children to the pending tests set.
       const addChildren = (item: vscode.TestItem) => {
@@ -76,7 +78,8 @@ suite('Test Runner Factory', () => {
       roots.push(item)
     })
     const runTracker = runFactory.newRun(
-      new vscode.TestRunRequest(Array.from(roots))
+      new vscode.TestRunRequest(Array.from(roots)),
+      sampleToken
     )
 
     // Confirm that the returned TestRunTracker is set up and can execute each test case.

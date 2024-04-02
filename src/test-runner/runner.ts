@@ -11,6 +11,8 @@ import {MessageConnection} from 'vscode-jsonrpc'
 import {TestRunTracker} from './run-tracker'
 import {RunTrackerFactory} from './run-factory'
 
+export const CANCEL_ERROR_CODE = -32603
+
 @Injectable()
 export class TestRunner implements OnModuleInit, vscode.Disposable {
   @Inject(EXTENSION_CONTEXT_TOKEN) private readonly ctx: vscode.ExtensionContext
@@ -42,21 +44,21 @@ export class TestRunner implements OnModuleInit, vscode.Disposable {
 
   private async runHandler(
     request: vscode.TestRunRequest,
-    token: vscode.CancellationToken
+    cancelToken: vscode.CancellationToken
   ) {
-    // TODO(IDE-978): Support cancellation token.
     const conn = await this.buildServer.getConnection()
-    const requestTracker = this.runFactory.newRun(request)
+    const requestTracker = this.runFactory.newRun(request, cancelToken)
 
-    await requestTracker.executeRun(async item => {
-      await this.runTestCase(item, requestTracker, conn)
+    await requestTracker.executeRun(async (item, cancelToken) => {
+      await this.runTestCase(item, requestTracker, conn, cancelToken)
     })
   }
 
   private async runTestCase(
     item: vscode.TestItem,
     runTracker: TestRunTracker,
-    conn: MessageConnection
+    conn: MessageConnection,
+    cancelToken: vscode.CancellationToken
   ) {
     const testInfo = this.testCaseStore.testCaseMetadata.get(item)
     if (!testInfo) return
@@ -65,7 +67,28 @@ export class TestRunner implements OnModuleInit, vscode.Disposable {
       return
     }
 
-    let result = await conn.sendRequest(bsp.BuildTargetTest.type, params)
-    testInfo.processTestRunResult(runTracker, result)
+    let result: bsp.TestResult | undefined
+    try {
+      result = await conn.sendRequest(
+        bsp.BuildTargetTest.type,
+        params,
+        cancelToken
+      )
+    } catch (e) {
+      if (e.code === CANCEL_ERROR_CODE) {
+        runTracker.updateStatus(
+          item,
+          TestCaseStatus.Errored,
+          new vscode.TestMessage(
+            `Testing canceled by user during run of ${item.label}.`
+          )
+        )
+        return
+      } else {
+        throw e
+      }
+    }
+
+    if (result) testInfo.processTestRunResult(runTracker, result)
   }
 }

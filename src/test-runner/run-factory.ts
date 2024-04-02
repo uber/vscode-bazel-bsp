@@ -1,9 +1,9 @@
 import {randomUUID} from 'crypto'
-
+import {CancellationToken, TestRunRequest} from 'vscode'
 import {Inject, Injectable} from '@nestjs/common'
+
 import {TestCaseStore} from '../test-explorer/store'
 import {TestRunTracker} from './run-tracker'
-import {TestRunRequest} from 'vscode'
 import {BazelBSPBuildClient} from '../test-explorer/client'
 
 @Injectable()
@@ -16,14 +16,18 @@ export class RunTrackerFactory {
    * @param request The test run request which will be used to populate a TestRunTracker.
    * @returns TestRunTracker populated for this run.
    */
-  public newRun(request: TestRunRequest): TestRunTracker {
+  public newRun(
+    request: TestRunRequest,
+    cancelToken: CancellationToken
+  ): TestRunTracker {
     const originId = randomUUID()
     const run = this.testCaseStore.testController.createTestRun(request)
     const requestTracker = new TestRunTracker(
       this.testCaseStore.testCaseMetadata,
       run,
       request,
-      originId
+      originId,
+      cancelToken
     )
 
     this.buildClient.registerOriginHandlers(originId, requestTracker)

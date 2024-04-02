@@ -25,12 +25,14 @@ export class TestRunTracker implements TaskOriginHandlers {
   private run: vscode.TestRun
   private _originName: string
   private onDoneCallback: () => void
+  private cancelToken: vscode.CancellationToken
 
   constructor(
     testCaseMetadata: WeakMap<vscode.TestItem, TestCaseInfo>,
     run: vscode.TestRun,
     request: vscode.TestRunRequest,
-    originName: string
+    originName: string,
+    cancelToken: vscode.CancellationToken
   ) {
     this.allTests = new Map<TestItemType, vscode.TestItem[]>()
     this.status = new Map<vscode.TestItem, TestCaseStatus>()
@@ -38,6 +40,7 @@ export class TestRunTracker implements TaskOriginHandlers {
     this.run = run
     this.request = request
     this._originName = originName
+    this.cancelToken = cancelToken
 
     this.prepareCurrentRun()
   }
@@ -52,9 +55,15 @@ export class TestRunTracker implements TaskOriginHandlers {
    * During a run, it is expected that the callback will call updateStatus at least once to report test outcome.
    * The callback may optionally update a test's children as well.
    * If an item is no longer pending by the time it is reached in the iteration, it will be skipped.
+   * If the run is canceled, the remaining items will be skipped.
    * @param callback Callback containing the test execution logic for a given test case.
    */
-  public async executeRun(callback: (item: vscode.TestItem) => Promise<void>) {
+  public async executeRun(
+    callback: (
+      item: vscode.TestItem,
+      cancelToken: vscode.CancellationToken
+    ) => Promise<void>
+  ) {
     // All items below the roots of the TestRunRequest will be shown as enqueued.
     for (const item of this) {
       this.run.enqueued(item)
@@ -62,9 +71,16 @@ export class TestRunTracker implements TaskOriginHandlers {
 
     // Run the callback for each test case.
     for (const item of this) {
+      if (this.cancelToken.isCancellationRequested) {
+        this.run.appendOutput(
+          'Run canceled by user.  Remaining items will be skipped.\r\n'
+        )
+        break
+      }
+
       const initialStatus = TestCaseStatus.Started
       this.updateStatus(item, initialStatus)
-      await callback(item)
+      await callback(item, this.cancelToken)
 
       if (this.status.get(item) === initialStatus) {
         // If an updated status has not been set by the callback, consider it skipped.
