@@ -7,20 +7,21 @@ import {
   EXTENSION_CONTEXT_TOKEN,
   PRIMARY_OUTPUT_CHANNEL_TOKEN,
 } from '../custom-providers'
+import {ConnectionDetailsParser} from './connection-details'
+import {Utils} from '../utils/utils'
 
-// TODO(IDE-946): Update this to use the correct launch command and directory.
-const LAUNCH_COMMAND =
-  '/home/user/fievel/experimental/users/mnoah1/launch_bsp.sh'
-const LAUNCH_DIR = '/home/user/fievel'
+const SERVER_NAME = 'bazelbsp'
 
 @Injectable()
 export class BuildServerManager implements vscode.Disposable, OnModuleInit {
   @Inject(EXTENSION_CONTEXT_TOKEN) private readonly ctx: vscode.ExtensionContext
   @Inject(PRIMARY_OUTPUT_CHANNEL_TOKEN)
   private readonly outputChannel: vscode.OutputChannel
+  @Inject(ConnectionDetailsParser)
+  private readonly connectionDetailsParser: ConnectionDetailsParser
 
-  private connectionReject: (value: rpc.MessageConnection) => void
-  private connectionResolve: (reason?: any) => void
+  private connectionReject: (reason?: any) => void
+  private connectionResolve: (value: rpc.MessageConnection) => void
   private connectionPromisePending: boolean
   private connection: Promise<rpc.MessageConnection>
 
@@ -46,11 +47,34 @@ export class BuildServerManager implements vscode.Disposable, OnModuleInit {
     return this.connection
   }
 
-  // TODO(IDE-946): Update this to use the correct launch command and directory, and handle execeptions.
-  serverLaunch() {
+  async serverLaunch() {
     this.resetConnectionPromise()
     try {
-      let childProcess = cp.spawn(LAUNCH_COMMAND, {cwd: LAUNCH_DIR})
+      const rootDir = await Utils.getWorkspaceGitRoot()
+      if (!rootDir) {
+        this.outputChannel.appendLine(
+          'Unable to determine workspace root. Please ensure you are in a valid git repository.'
+        )
+        return
+      }
+
+      let connDetails =
+        await this.connectionDetailsParser.getServerConnectionDetails(
+          SERVER_NAME,
+          rootDir
+        )
+
+      if (!connDetails) {
+        // TODO(IDE-946): Prompt to help install the bsp server in the current repo.
+        vscode.window.showErrorMessage(
+          'Unable to load connection details for the Bazel BSP server. Please install Bazel BSP in this workspace and then reload the window.'
+        )
+        return
+      }
+
+      const cmd = connDetails.argv[0]
+      const args = connDetails.argv.slice(1)
+      let childProcess = cp.spawn(cmd, args, {cwd: rootDir})
       let connection = rpc.createMessageConnection(
         new rpc.StreamMessageReader(childProcess.stdout),
         new rpc.StreamMessageWriter(childProcess.stdin)

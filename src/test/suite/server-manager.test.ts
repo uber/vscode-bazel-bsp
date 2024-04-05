@@ -12,6 +12,9 @@ import {
 } from '../../custom-providers'
 import {BuildServerManager} from '../../rpc/server-manager'
 import {createSampleMessageConnection} from './test-utils'
+import {ConnectionDetailsParser} from '../../rpc/connection-details'
+import {Utils} from '../../utils/utils'
+import {BspConnectionDetails} from '../../bsp/bsp'
 
 suite('Build Server', () => {
   let ctx: vscode.ExtensionContext
@@ -19,12 +22,15 @@ suite('Build Server', () => {
   let spawnStub: sinon.SinonStub
   let sampleConn: rpc.MessageConnection
 
+  const sandbox = sinon.createSandbox()
+
   beforeEach(async () => {
     let process = cp.spawn('echo', ['hello'])
-    spawnStub = sinon.stub(cp, 'spawn').returns(process)
+    spawnStub = sandbox.stub(cp, 'spawn').returns(process)
 
     sampleConn = createSampleMessageConnection()
-    sinon.stub(rpc, 'createMessageConnection').returns(sampleConn)
+    sandbox.stub(rpc, 'createMessageConnection').returns(sampleConn)
+    sandbox.stub(Utils, 'getWorkspaceGitRoot').resolves('/sample/path')
 
     ctx = {subscriptions: []} as unknown as vscode.ExtensionContext
     const moduleRef = await Test.createTestingModule({
@@ -33,13 +39,33 @@ suite('Build Server', () => {
         contextProviderFactory(ctx),
         BuildServerManager,
       ],
-    }).compile()
+    })
+      .useMocker(token => {
+        if (token === ConnectionDetailsParser) {
+          return {
+            getServerConnectionDetails: async (
+              bspServerName: string,
+              repoRoot: string
+            ): Promise<BspConnectionDetails> => {
+              return {
+                name: bspServerName,
+                argv: ['/bin/sample', 'arg1', 'arg2'],
+                version: '1.0.0',
+                bspVersion: '1.0.0',
+                languages: [],
+              }
+            },
+          }
+        }
+        throw new Error('No mock available for token.')
+      })
+      .compile()
 
     buildServer = moduleRef.get(BuildServerManager)
   })
 
   afterEach(() => {
-    sinon.restore()
+    sandbox.restore()
   })
 
   test('OnModuleInit', async () => {

@@ -16,6 +16,7 @@ import {RunTrackerFactory} from '../../test-runner/run-factory'
 import {TestCaseInfo} from '../../test-explorer/test-info'
 import {populateTestCaseStore} from './test-utils'
 import sinon from 'sinon'
+import {ConnectionDetailsParser} from '../../rpc/connection-details'
 
 suite('Test Runner Factory', () => {
   let ctx: vscode.ExtensionContext
@@ -37,6 +38,7 @@ suite('Test Runner Factory', () => {
         TestResolver,
         TestRunner,
         RunTrackerFactory,
+        ConnectionDetailsParser,
       ],
     }).compile()
     moduleRef.init()

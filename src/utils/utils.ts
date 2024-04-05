@@ -1,5 +1,10 @@
 import * as vscode from 'vscode'
 import * as path from 'path'
+import {promisify} from 'util'
+import {exec} from 'child_process'
+import * as fs from 'fs/promises'
+
+const execAsync = promisify(exec)
 
 export class Utils {
   static getWorkspaceRoot(): vscode.Uri | null {
@@ -19,6 +24,30 @@ export class Utils {
     return vscode.Uri.parse(
       path.dirname(vscode.workspace.workspaceFile.toString())
     )
+  }
+
+  static async getGitRootFromPath(fsPath: string): Promise<string | null> {
+    const {stdout} = await execAsync('git rev-parse --show-toplevel', {
+      cwd: fsPath,
+    })
+    return stdout.trim()
+  }
+
+  static async getWorkspaceGitRoot(): Promise<string | null> {
+    const workspaceRoot = Utils.getWorkspaceRoot()
+    if (!workspaceRoot) {
+      return null
+    }
+    return Utils.getGitRootFromPath(workspaceRoot.fsPath)
+  }
+
+  // Use wrapped file i/o operations for use in stubbing.
+  static async readdir(path: string): Promise<string[]> {
+    return fs.readdir(path)
+  }
+
+  static async readFile(path: string): Promise<string> {
+    return fs.readFile(path, 'utf8')
   }
 }
 
