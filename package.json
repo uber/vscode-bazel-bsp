@@ -19,7 +19,12 @@
   ],
   "main": "./build/extension.js",
   "contributes": {
-    "commands": []
+    "commands": [
+      {
+        "command": "bazelbsp.install",
+        "title": "Install Bazel BSP"
+      }
+    ]
   },
   "scripts": {
     "package": "vsce package --yarn",

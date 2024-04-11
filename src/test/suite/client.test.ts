@@ -11,7 +11,7 @@ import {
   contextProviderFactory,
   outputChannelProvider,
 } from '../../custom-providers'
-import {BuildServerManager} from '../../rpc/server-manager'
+import {BuildServerManager} from '../../server/server-manager'
 import {Utils} from '../../utils/utils'
 import {createSampleMessageConnection} from './test-utils'
 

@@ -10,7 +10,7 @@ import {
   contextProviderFactory,
   outputChannelProvider,
 } from '../../custom-providers'
-import {ConnectionDetailsParser} from '../../rpc/connection-details'
+import {ConnectionDetailsParser} from '../../server/connection-details'
 import {Utils} from '../../utils/utils'
 
 suite('Connection Info Parser', () => {

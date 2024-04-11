@@ -1,7 +1,7 @@
 import * as vscode from 'vscode'
 import {NestFactory} from '@nestjs/core'
 import {bootstrap} from './app.module'
-import {BuildServerManager} from './rpc/server-manager'
+import {BuildServerManager} from './server/server-manager'
 import {BazelBSPBuildClient} from './test-explorer/client'
 import {TestCaseStore} from './test-explorer/store'
 

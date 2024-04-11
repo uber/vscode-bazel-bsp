@@ -10,9 +10,9 @@ import {
   contextProviderFactory,
   outputChannelProvider,
 } from '../../custom-providers'
-import {BuildServerManager} from '../../rpc/server-manager'
+import {BuildServerManager} from '../../server/server-manager'
 import {createSampleMessageConnection} from './test-utils'
-import {ConnectionDetailsParser} from '../../rpc/connection-details'
+import {ConnectionDetailsParser} from '../../server/connection-details'
 import {Utils} from '../../utils/utils'
 import {BspConnectionDetails} from '../../bsp/bsp'
 

@@ -6,14 +6,14 @@ import {beforeEach, afterEach} from 'mocha'
 import {BazelBSPBuildClient} from '../../test-explorer/client'
 import {TestCaseStore} from '../../test-explorer/store'
 import {TestResolver} from '../../test-explorer/resolver'
-import {BuildServerManager} from '../../rpc/server-manager'
+import {BuildServerManager} from '../../server/server-manager'
 import {
   contextProviderFactory,
   outputChannelProvider,
 } from '../../custom-providers'
 import {TestRunner} from '../../test-runner/runner'
 import {RunTrackerFactory} from '../../test-runner/run-factory'
-import {ConnectionDetailsParser} from '../../rpc/connection-details'
+import {ConnectionDetailsParser} from '../../server/connection-details'
 
 suite('Test Controller', () => {
   let ctx: vscode.ExtensionContext

@@ -6,7 +6,7 @@ import {beforeEach, afterEach} from 'mocha'
 import {BazelBSPBuildClient} from '../../test-explorer/client'
 import {TestCaseStore} from '../../test-explorer/store'
 import {TestResolver} from '../../test-explorer/resolver'
-import {BuildServerManager} from '../../rpc/server-manager'
+import {BuildServerManager} from '../../server/server-manager'
 import {
   contextProviderFactory,
   outputChannelProvider,
@@ -16,7 +16,7 @@ import {RunTrackerFactory} from '../../test-runner/run-factory'
 import {TestCaseInfo} from '../../test-explorer/test-info'
 import {populateTestCaseStore} from './test-utils'
 import sinon from 'sinon'
-import {ConnectionDetailsParser} from '../../rpc/connection-details'
+import {ConnectionDetailsParser} from '../../server/connection-details'
 
 suite('Test Runner Factory', () => {
   let ctx: vscode.ExtensionContext

@@ -7,7 +7,7 @@ import * as sinon from 'sinon'
 import {BazelBSPBuildClient} from '../../test-explorer/client'
 import {TestCaseStore} from '../../test-explorer/store'
 import {TestResolver} from '../../test-explorer/resolver'
-import {BuildServerManager} from '../../rpc/server-manager'
+import {BuildServerManager} from '../../server/server-manager'
 import {
   contextProviderFactory,
   outputChannelProvider,

@@ -2,14 +2,15 @@ import * as vscode from 'vscode'
 import {Module} from '@nestjs/common'
 import {NestFactory} from '@nestjs/core'
 
-import {BuildServerManager} from './rpc/server-manager'
+import {BuildServerManager} from './server/server-manager'
 import {BazelBSPBuildClient} from './test-explorer/client'
 import {TestCaseStore} from './test-explorer/store'
 import {TestRunner} from './test-runner/runner'
 import {contextProviderFactory, outputChannelProvider} from './custom-providers'
 import {TestResolver} from './test-explorer/resolver'
 import {RunTrackerFactory} from './test-runner/run-factory'
-import {ConnectionDetailsParser} from './rpc/connection-details'
+import {ConnectionDetailsParser} from './server/connection-details'
+import {BazelBSPInstaller} from './server/install'
 
 export async function bootstrap(context: vscode.ExtensionContext) {
   // Define the application's dependencies.  This is done at runtime to allow for dynamically created providers such as extension context.
@@ -26,6 +27,7 @@ export async function bootstrap(context: vscode.ExtensionContext) {
       TestCaseStore,
       RunTrackerFactory,
       ConnectionDetailsParser,
+      BazelBSPInstaller,
     ],
   })
   class AppModule {}

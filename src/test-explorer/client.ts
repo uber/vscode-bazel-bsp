@@ -2,7 +2,7 @@ import * as vscode from 'vscode'
 import {Inject, Injectable, OnModuleInit} from '@nestjs/common'
 
 import * as bsp from '../bsp/bsp'
-import {BuildServerManager} from '../rpc/server-manager'
+import {BuildServerManager} from '../server/server-manager'
 import {EXTENSION_CONTEXT_TOKEN} from '../custom-providers'
 import {Deferred, Utils} from '../utils/utils'
 const pkg = require('../../package.json')

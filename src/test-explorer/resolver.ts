@@ -4,7 +4,7 @@ import {Inject, Injectable, OnModuleInit} from '@nestjs/common'
 import {TestCaseStore} from './store'
 import {BazelBSPBuildClient} from './client'
 import {EXTENSION_CONTEXT_TOKEN} from '../custom-providers'
-import {BuildServerManager} from '../rpc/server-manager'
+import {BuildServerManager} from '../server/server-manager'
 import * as bsp from '../bsp/bsp'
 import {TestCaseInfo, TestItemType} from './test-info'
 
