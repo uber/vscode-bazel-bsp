@@ -12,6 +12,7 @@ import {Utils} from '../utils/utils'
 import {INSTALL_BSP_COMMAND} from './install'
 import {BspConnectionDetails} from '../bsp/bsp'
 
+export const CANCEL_ERROR_CODE = -32603
 const SERVER_NAME = 'bazelbsp'
 
 @Injectable()

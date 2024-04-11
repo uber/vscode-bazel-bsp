@@ -7,7 +7,10 @@ import * as sinon from 'sinon'
 import {BazelBSPBuildClient} from '../../test-explorer/client'
 import {TestCaseStore} from '../../test-explorer/store'
 import {TestResolver} from '../../test-explorer/resolver'
-import {BuildServerManager} from '../../server/server-manager'
+import {
+  BuildServerManager,
+  CANCEL_ERROR_CODE,
+} from '../../server/server-manager'
 import {
   contextProviderFactory,
   outputChannelProvider,
@@ -214,6 +217,53 @@ suite('Test Resolver', () => {
       } catch (e) {
         assert.ok(e instanceof Error)
       }
+    })
+
+    test('refresh success', async () => {
+      const sendRequestStub = sandbox
+        .stub(sampleConn, 'sendRequest')
+        .resolves(sampleBuildTargetsResult)
+
+      const root = testCaseStore.testController.createTestItem(
+        'root',
+        'Bazel Test Targets'
+      )
+      testCaseStore.testController.items.add(root)
+      testCaseStore.testCaseMetadata.set(
+        root,
+        new TestCaseInfo(root, TestItemType.Root)
+      )
+
+      const tokenSource = new vscode.CancellationTokenSource()
+      assert.ok(testCaseStore.testController.refreshHandler)
+      await testCaseStore.testController.refreshHandler(tokenSource.token)
+      assert.equal(root.children.size, 3)
+      root.children.forEach(child => {
+        assert.ok(testCaseStore.testCaseMetadata.get(child))
+      })
+    })
+
+    test('cancelled refresh', async () => {
+      const sendRequestStub = sandbox
+        .stub(sampleConn, 'sendRequest')
+        .rejects({code: CANCEL_ERROR_CODE})
+
+      const root = testCaseStore.testController.createTestItem(
+        'root',
+        'Bazel Test Targets'
+      )
+      testCaseStore.testController.items.add(root)
+      testCaseStore.testCaseMetadata.set(
+        root,
+        new TestCaseInfo(root, TestItemType.Root)
+      )
+
+      const tokenSource = new vscode.CancellationTokenSource()
+      tokenSource.cancel()
+      assert.ok(testCaseStore.testController.refreshHandler)
+      await testCaseStore.testController.refreshHandler(tokenSource.token)
+      assert.equal(root.children.size, 0)
+      assert.ok(root.description?.startsWith('Refresh Canceled:'))
     })
   })
 })

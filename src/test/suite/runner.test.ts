@@ -8,12 +8,15 @@ import {MessageConnection} from 'vscode-jsonrpc'
 import {BazelBSPBuildClient} from '../../test-explorer/client'
 import {TestCaseStore} from '../../test-explorer/store'
 import {TestResolver} from '../../test-explorer/resolver'
-import {BuildServerManager} from '../../server/server-manager'
+import {
+  BuildServerManager,
+  CANCEL_ERROR_CODE,
+} from '../../server/server-manager'
 import {
   contextProviderFactory,
   outputChannelProvider,
 } from '../../custom-providers'
-import {CANCEL_ERROR_CODE, TestRunner} from '../../test-runner/runner'
+import {TestRunner} from '../../test-runner/runner'
 import {
   createSampleMessageConnection,
   populateTestCaseStore,
