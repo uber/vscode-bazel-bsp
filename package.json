@@ -22,7 +22,7 @@
     "commands": [
       {
         "command": "bazelbsp.install",
-        "title": "Install Bazel BSP"
+        "title": "Bazel BSP: Install Bazel BSP Server"
       }
     ],
     "configuration": {
