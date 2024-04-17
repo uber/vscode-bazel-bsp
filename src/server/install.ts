@@ -14,17 +14,20 @@ import {
 import {
   SettingName,
   getExtensionSetting,
-  openSettingsEditor,
+  settingModifyPrompt,
 } from '../utils/settings'
 
 export const INSTALL_BSP_COMMAND = 'bazelbsp.install'
 
-// TODO(IDE-1005): Make configurable based on VS Code settings.
 const MAVEN_PACKAGE = 'org.jetbrains.bsp:bazel-bsp'
 const INSTALL_METHOD = 'org.jetbrains.bsp.bazel.install.Install'
-const BAZEL_BSP_VERSION = '3.1.0-20240405-0a05fa1-NIGHTLY'
 const COURSIER_URL = 'https://git.io/coursier-cli'
-const BAZEL_REL_PATH = 'tools/bazel'
+
+export interface InstallConfig {
+  bazelProjectFilePath: string
+  serverVersion: string
+  bazelBinaryPath: string
+}
 
 export class BazelBSPInstaller {
   @Inject(PRIMARY_OUTPUT_CHANNEL_TOKEN)
@@ -66,6 +69,15 @@ export class BazelBSPInstaller {
       this.outputChannel.appendLine(`Installation in ${root} declined by user`)
       return false
     }
+
+    const installConfig = await this.getInstallConfig()
+    if (!installConfig) {
+      this.outputChannel.appendLine(
+        'Installation interrupted: failed to get settings.'
+      )
+      this.outputChannel.show()
+      return false
+    }
     this.outputChannel.appendLine(`Installing Bazel BSP server at ${root}`)
 
     // Coursier install, to avoid dependence on the local environment.
@@ -75,8 +87,12 @@ export class BazelBSPInstaller {
     }
 
     // Execute the BSP installer within this workspace.
-    const exitCode = await this.runInstaller(coursierPath, root)
+    const exitCode = await this.runInstaller(coursierPath, root, installConfig)
     if (exitCode !== 0) {
+      this.outputChannel.appendLine(
+        'Bazel BSP installation failed. Please see output above for details.'
+      )
+      this.outputChannel.show()
       return false
     }
     return true
@@ -118,24 +134,19 @@ export class BazelBSPInstaller {
    */
   private async runInstaller(
     coursierPath: string,
-    root: string
+    root: string,
+    config: InstallConfig
   ): Promise<number | null> {
     this.outputChannel.appendLine(
       `Launching Bazel BSP installer from Maven package: ${MAVEN_PACKAGE}`
     )
-    const bazelPath = path.join(root, BAZEL_REL_PATH)
-    const projectFilePath = getExtensionSetting(
-      SettingName.BAZEL_PROJECT_FILE_PATH
-    )
-    if (projectFilePath === undefined) {
-      await this.bazelProjectErrorPrompt()
-      return null
-    }
+    const bazelPath = path.join(root, config.bazelBinaryPath)
+
     // Flags to be passed to the installer.
     // See CliOptionsProvider in the server code for available options.
     const installFlags: Map<string, string> = new Map([
       // Set Bazel project details to be used if a project file is not already present.
-      ['--project-view-file', projectFilePath],
+      ['--project-view-file', config.bazelProjectFilePath],
       ['--bazel-binary', bazelPath],
       ['--targets', '# //YOUR_TARGETS/...'],
     ])
@@ -144,7 +155,7 @@ export class BazelBSPInstaller {
       .join(' ')
 
     // Full install command including flags.
-    const installCommand = `"${coursierPath}" launch ${MAVEN_PACKAGE}:${BAZEL_BSP_VERSION} -M ${INSTALL_METHOD} -- ${flagsString}`
+    const installCommand = `"${coursierPath}" launch ${MAVEN_PACKAGE}:${config.serverVersion} -M ${INSTALL_METHOD} -- ${flagsString}`
 
     // Report progress in output channel.
     const installProcess = cp.spawn(installCommand, {cwd: root, shell: true})
@@ -169,16 +180,48 @@ export class BazelBSPInstaller {
     })
   }
 
-  private async bazelProjectErrorPrompt() {
-    const modifySelection: vscode.MessageItem = {title: 'Edit in settings'}
-    const userSelection =
-      await vscode.window.showErrorMessage<vscode.MessageItem>(
-        'Unable to determine the Bazel project file path from settings.',
-        modifySelection,
-        {title: 'Cancel', isCloseAffordance: true}
+  private async getInstallConfig(): Promise<InstallConfig | null> {
+    const settingError = (setting: SettingName) => {
+      this.outputChannel.appendLine(
+        `Install interrupted. Please check the ${setting} setting to ensure a valid value.`
       )
-    if (userSelection?.title === modifySelection.title) {
-      openSettingsEditor(SettingName.BAZEL_PROJECT_FILE_PATH)
+    }
+    const projectFilePath = getExtensionSetting(
+      SettingName.BAZEL_PROJECT_FILE_PATH
+    )
+    if (projectFilePath === undefined) {
+      settingModifyPrompt(
+        'Unable to determine the Bazel project file path from settings.',
+        SettingName.BAZEL_PROJECT_FILE_PATH
+      )
+      settingError(SettingName.BAZEL_PROJECT_FILE_PATH)
+      return null
+    }
+
+    const bazelBspVersion = getExtensionSetting(SettingName.BSP_SERVER_VERSION)
+    if (bazelBspVersion === undefined) {
+      settingModifyPrompt(
+        'Unable to determine the Bazel BSP version from settings.',
+        SettingName.BSP_SERVER_VERSION
+      )
+      settingError(SettingName.BSP_SERVER_VERSION)
+      return null
+    }
+
+    const bazelBinaryPath = getExtensionSetting(SettingName.BAZEL_BINARY_PATH)
+    if (bazelBinaryPath === undefined) {
+      settingModifyPrompt(
+        'Unable to determine the Bazel BSP binary path from settings.',
+        SettingName.BAZEL_BINARY_PATH
+      )
+      settingError(SettingName.BAZEL_BINARY_PATH)
+      return null
+    }
+
+    return {
+      bazelProjectFilePath: projectFilePath,
+      serverVersion: bazelBspVersion,
+      bazelBinaryPath: bazelBinaryPath,
     }
   }
 }

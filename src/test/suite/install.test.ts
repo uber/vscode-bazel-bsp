@@ -36,9 +36,6 @@ suite('BSP Installer', () => {
 
     // Return a fixed workspace root to avoid impact of local environment.
     sandbox.stub(Utils, 'getWorkspaceGitRoot').resolves('/repo/root')
-    sandbox
-      .stub(settings, 'getExtensionSetting')
-      .returns('projectview.bazelproject')
 
     // Set up the testing app which includes injected dependnecies and the stubbed BuildServerManager
     ctx = {subscriptions: []} as unknown as vscode.ExtensionContext
@@ -61,6 +58,15 @@ suite('BSP Installer', () => {
     sandbox
       .stub(vscode.window, 'showErrorMessage')
       .resolves({title: 'Install BSP'})
+
+    sandbox
+      .stub(settings, 'getExtensionSetting')
+      .withArgs(settings.SettingName.BAZEL_BINARY_PATH)
+      .returns('bazel')
+      .withArgs(settings.SettingName.BAZEL_PROJECT_FILE_PATH)
+      .returns('projectview.bazelproject')
+      .withArgs(settings.SettingName.BSP_SERVER_VERSION)
+      .returns('2.0.0')
 
     // Simulated data returned by coursier download request.
     const sampleData = 'sample data'
@@ -85,7 +91,39 @@ suite('BSP Installer', () => {
       .stub(vscode.window, 'showErrorMessage')
       .resolves({title: 'Install BSP'})
 
+    sandbox
+      .stub(settings, 'getExtensionSetting')
+      .withArgs(settings.SettingName.BAZEL_BINARY_PATH)
+      .returns('bazel')
+      .withArgs(settings.SettingName.BAZEL_PROJECT_FILE_PATH)
+      .returns('projectview.bazelproject')
+      .withArgs(settings.SettingName.BSP_SERVER_VERSION)
+      .returns('2.0.0')
+
     sandbox.stub(axios.default, 'get').rejects(new Error('sample error'))
+
+    const writeFileSpy = sandbox.spy(fs, 'writeFile')
+    const installResult = await bazelBSPInstaller.install()
+
+    // Confirm that installation was gracefully interrupted.
+    assert.ok(writeFileSpy.notCalled)
+    assert.ok(spawnStub.notCalled)
+    assert.ok(!installResult)
+  })
+
+  test('undefined setting', async () => {
+    sandbox
+      .stub(vscode.window, 'showErrorMessage')
+      .resolves({title: 'Install BSP'})
+
+    sandbox
+      .stub(settings, 'getExtensionSetting')
+      .withArgs(settings.SettingName.BAZEL_BINARY_PATH)
+      .returns(undefined)
+      .withArgs(settings.SettingName.BAZEL_PROJECT_FILE_PATH)
+      .returns('projectview.bazelproject')
+      .withArgs(settings.SettingName.BSP_SERVER_VERSION)
+      .returns('2.0.0')
 
     const writeFileSpy = sandbox.spy(fs, 'writeFile')
     const installResult = await bazelBSPInstaller.install()

@@ -39,6 +39,16 @@
           "default": "./.bsp/projectview.bazelproject",
           "description": "Project view file containing Bazel information for this workspace. Path should be relative to the root of the project git repository. See https://ij.bazel.build/docs/project-views.html for details.",
           "pattern": ".*\\.bazelproject$"
+        },
+        "bazelbsp.serverVersion": {
+          "type": "string",
+          "default": "3.2.0",
+          "description": "Version of the Bazel BSP server to install."
+        },
+        "bazelbsp.bazelBinaryPath": {
+          "type": "string",
+          "default": "tools/bazel",
+          "description": "Bazel binary path (relative to repository root).  Will be used when generating a new .bazelproject file."
         }
       }
     }
