@@ -20,6 +20,7 @@ import {MessageConnection} from 'vscode-jsonrpc'
 import {Utils} from '../../utils/utils'
 import * as bsp from '../../bsp/bsp'
 import {TestCaseInfo, TestItemType} from '../../test-explorer/test-info'
+import * as settings from '../../utils/settings'
 
 suite('Test Resolver', () => {
   let ctx: vscode.ExtensionContext
@@ -138,6 +139,15 @@ suite('Test Resolver', () => {
         bspVersion: '1.0.0',
         capabilities: {},
       })
+
+      sandbox.stub(Utils, 'getWorkspaceGitRoot').resolves('/repo/root')
+      sandbox
+        .stub(settings, 'getExtensionSetting')
+        .withArgs(settings.SettingName.BAZEL_PROJECT_FILE_PATH)
+        .onFirstCall()
+        .returns('./projectview.bazelproject')
+        .onSecondCall()
+        .returns('./projectview2.bazelproject')
     })
 
     test('root', async () => {
@@ -150,15 +160,19 @@ suite('Test Resolver', () => {
       assert.ok(root)
       assert.ok(root.canResolveChildren)
       assert.equal(root.children.size, 0)
+      assert.ok(root.uri?.path.endsWith('projectview.bazelproject'))
 
       const metadata = testCaseStore.testCaseMetadata.get(root)
       assert.ok(metadata)
       assert.equal(metadata.type, TestItemType.Root)
 
-      // A second run returns the same root.
+      // A second run respects modified URI.
       await testCaseStore.testController.resolveHandler(undefined)
       const root2 = testCaseStore.testController.items.get('root')
-      assert.deepStrictEqual(root2, root)
+      assert.ok(root2)
+      assert.strictEqual(root2.label, root.label)
+      assert.strictEqual(root2.id, root.id)
+      assert.ok(root2.uri?.path.endsWith('projectview2.bazelproject'))
     })
 
     test('targets below root', async () => {

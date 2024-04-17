@@ -18,6 +18,7 @@ import {BuildServerManager} from '../../server/server-manager'
 import {Utils} from '../../utils/utils'
 import {createSampleMessageConnection} from './test-utils'
 import {BazelBSPInstaller} from '../../server/install'
+import * as settings from '../../utils/settings'
 
 suite('BSP Installer', () => {
   let ctx: vscode.ExtensionContext
@@ -35,6 +36,9 @@ suite('BSP Installer', () => {
 
     // Return a fixed workspace root to avoid impact of local environment.
     sandbox.stub(Utils, 'getWorkspaceGitRoot').resolves('/repo/root')
+    sandbox
+      .stub(settings, 'getExtensionSetting')
+      .returns('projectview.bazelproject')
 
     // Set up the testing app which includes injected dependnecies and the stubbed BuildServerManager
     ctx = {subscriptions: []} as unknown as vscode.ExtensionContext

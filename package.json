@@ -24,7 +24,24 @@
         "command": "bazelbsp.install",
         "title": "Install Bazel BSP"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Bazel Build Server Client",
+      "properties": {
+        "bazelbsp.buildFileName": {
+          "type": "string",
+          "default": "BUILD.bazel",
+          "enum": ["BUILD", "BUILD.bazel"],
+          "description": "Build file name to be used for navigation in the UI."
+        },
+        "bazelbsp.bazelProjectFilePath": {
+          "type": "string",
+          "default": "./.bsp/projectview.bazelproject",
+          "description": "Project view file containing Bazel information for this workspace. Path should be relative to the root of the project git repository. See https://ij.bazel.build/docs/project-views.html for details.",
+          "pattern": ".*\\.bazelproject$"
+        }
+      }
+    }
   },
   "scripts": {
     "package": "vsce package --yarn",

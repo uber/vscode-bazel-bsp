@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import {Inject, Injectable, OnModuleInit} from '@nestjs/common'
+import path from 'path'
 
 import {TestCaseStore} from './store'
 import {BazelBSPBuildClient} from './client'
@@ -7,6 +8,8 @@ import {EXTENSION_CONTEXT_TOKEN} from '../custom-providers'
 import {BuildServerManager, CANCEL_ERROR_CODE} from '../server/server-manager'
 import * as bsp from '../bsp/bsp'
 import {TestCaseInfo, TestItemType} from './test-info'
+import {getExtensionSetting, SettingName} from '../utils/settings'
+import {Utils} from '../utils/utils'
 
 @Injectable()
 export class TestResolver implements OnModuleInit, vscode.Disposable {
@@ -62,23 +65,31 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
 
   /**
    * Sets up a single root to hold all other test cases provided by this extension.
+   * Selecting the root's file icon will navigate to the current project view file.
    */
-  private resolveRoot() {
-    if (this.store.testController.items.get('root')) {
-      // Single root already exists.
-      return
+  private async resolveRoot() {
+    let projectViewUri: vscode.Uri | undefined = undefined
+    const projectViewRelPath = getExtensionSetting(
+      SettingName.BAZEL_PROJECT_FILE_PATH
+    )
+
+    const repoRoot = await Utils.getWorkspaceGitRoot()
+    if (projectViewRelPath && repoRoot) {
+      const projectViewAbsPath = path.resolve(repoRoot, projectViewRelPath)
+      projectViewUri = vscode.Uri.parse(projectViewAbsPath)
     }
 
     const newTest = this.store.testController.createTestItem(
       'root',
-      'Bazel Test Targets'
+      'Bazel Test Targets',
+      projectViewUri
     )
     newTest.canResolveChildren = true
     this.store.testCaseMetadata.set(
       newTest,
       new TestCaseInfo(newTest, TestItemType.Root)
     )
-    this.store.testController.items.add(newTest)
+    this.store.testController.items.replace([newTest])
   }
 
   /**
@@ -122,16 +133,19 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
 
     // Process the returned targets, create new test items, and store their metadata.
     const updatedTestCases: vscode.TestItem[] = []
+    const buildFileName = getExtensionSetting(SettingName.BUILD_FILE_NAME)
     result.targets.forEach(target => {
       if (!target.capabilities.canTest) return
 
+      const buildFileUri =
+        target.baseDirectory && buildFileName
+          ? vscode.Uri.parse(path.join(target.baseDirectory, buildFileName))
+          : undefined
       // UI will group runs that have the same ID.
       const newTest = this.store.testController.createTestItem(
         target.id.uri,
         target.displayName ?? target.id.uri,
-        target.baseDirectory
-          ? vscode.Uri.parse(target.baseDirectory)
-          : undefined
+        buildFileUri
       )
       this.store.testCaseMetadata.set(
         newTest,

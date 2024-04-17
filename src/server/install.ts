@@ -11,6 +11,11 @@ import {
   EXTENSION_CONTEXT_TOKEN,
   PRIMARY_OUTPUT_CHANNEL_TOKEN,
 } from '../custom-providers'
+import {
+  SettingName,
+  getExtensionSetting,
+  openSettingsEditor,
+} from '../utils/settings'
 
 export const INSTALL_BSP_COMMAND = 'bazelbsp.install'
 
@@ -19,7 +24,6 @@ const MAVEN_PACKAGE = 'org.jetbrains.bsp:bazel-bsp'
 const INSTALL_METHOD = 'org.jetbrains.bsp.bazel.install.Install'
 const BAZEL_BSP_VERSION = '3.1.0-20240405-0a05fa1-NIGHTLY'
 const COURSIER_URL = 'https://git.io/coursier-cli'
-const BAZELPROJECT_REL_PATH = 'projectview.bazelproject'
 const BAZEL_REL_PATH = 'tools/bazel'
 
 export class BazelBSPInstaller {
@@ -120,12 +124,18 @@ export class BazelBSPInstaller {
       `Launching Bazel BSP installer from Maven package: ${MAVEN_PACKAGE}`
     )
     const bazelPath = path.join(root, BAZEL_REL_PATH)
-
+    const projectFilePath = getExtensionSetting(
+      SettingName.BAZEL_PROJECT_FILE_PATH
+    )
+    if (projectFilePath === undefined) {
+      await this.bazelProjectErrorPrompt()
+      return null
+    }
     // Flags to be passed to the installer.
     // See CliOptionsProvider in the server code for available options.
     const installFlags: Map<string, string> = new Map([
       // Set Bazel project details to be used if a project file is not already present.
-      ['--project-view-file', BAZELPROJECT_REL_PATH],
+      ['--project-view-file', projectFilePath],
       ['--bazel-binary', bazelPath],
       ['--targets', '# //YOUR_TARGETS/...'],
     ])
@@ -157,5 +167,18 @@ export class BazelBSPInstaller {
         resolve(null)
       })
     })
+  }
+
+  private async bazelProjectErrorPrompt() {
+    const modifySelection: vscode.MessageItem = {title: 'Edit in settings'}
+    const userSelection =
+      await vscode.window.showErrorMessage<vscode.MessageItem>(
+        'Unable to determine the Bazel project file path from settings.',
+        modifySelection,
+        {title: 'Cancel', isCloseAffordance: true}
+      )
+    if (userSelection?.title === modifySelection.title) {
+      openSettingsEditor(SettingName.BAZEL_PROJECT_FILE_PATH)
+    }
   }
 }
