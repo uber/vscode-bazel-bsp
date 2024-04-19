@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
 
-import {TestCaseInfo, TestItemType} from '../test-explorer/test-info'
+import {TestCaseInfo, TestItemType} from '../test-info/test-info'
 import {LogMessageParams} from '../bsp/bsp'
 import {TaskOriginHandlers} from '../test-explorer/client'
 
@@ -154,34 +154,81 @@ export class TestRunTracker implements TaskOriginHandlers {
     }
 
     for (const testItem of this.request.include) {
-      const collectChildren = (currentItem: vscode.TestItem) => {
-        const data = this.testCaseMetadata.get(currentItem)
-        this.status.set(currentItem, TestCaseStatus.Pending)
-
-        if (!data) return
-
-        // Recursively collect children.
-        currentItem.children.forEach(child => collectChildren(child))
-
-        // Add each test item to the appropriate map entry based on its TestItemType.
-        const existingEntry = this.allTests.get(data.type)
-        if (!existingEntry) {
-          this.allTests.set(data.type, [currentItem])
-        } else {
-          existingEntry.push(currentItem)
-        }
-      }
-      collectChildren(testItem)
+      this.recursivelyCollectChildren(this.allTests, testItem)
     }
   }
 
   /**
+   * Iterate recursively through all children of the given test item, and collect them in the destination map.
+   * @param destination Map to be populated with the collected test items, grouped by TestItemType.
+   * @param item root item at which to begin traversal. The root item will also be included in the map.
+   */
+  private recursivelyCollectChildren(
+    destination: Map<TestItemType, vscode.TestItem[]>,
+    item: vscode.TestItem
+  ) {
+    const collectChildren = (currentItem: vscode.TestItem) => {
+      const data = this.testCaseMetadata.get(currentItem)
+      this.status.set(currentItem, TestCaseStatus.Pending)
+
+      if (!data) return
+
+      // Recursively collect children.
+      currentItem.children.forEach(child => collectChildren(child))
+
+      // Add each test item to the appropriate map entry based on its TestItemType.
+      const existingEntry = destination.get(data.type)
+      if (!existingEntry) {
+        destination.set(data.type, [currentItem])
+      } else {
+        existingEntry.push(currentItem)
+      }
+    }
+    collectChildren(item)
+  }
+
+  /**
    * Iterates through each pending test case, ordered by TestItemType.
+   * This defines the ordering in which nodes will be traversed and executed during a run.
    * */
   *[Symbol.iterator]() {
+    const items = this.pendingTestItemIterator(this.allTests)
+    for (const item of items) {
+      yield item
+    }
+  }
+
+  /**
+   * Iterates through all pending test cases below the given test item, ordered by TestItemType.
+   * This can be used for updates to the tree below a certain parent.
+   * @param parent Parent test item whose children will be included in the iteration sequence.
+   * @returns Iterable sequence of pending children below the given parent.
+   */
+  *pendingChildrenIterator(parent: vscode.TestItem) {
+    // Recursively collect all children of this test case into a map grouped by TestItemType.
+    const currentChildren = new Map<TestItemType, vscode.TestItem[]>()
+    parent.children.forEach(child => {
+      this.recursivelyCollectChildren(currentChildren, child)
+    })
+
+    // Use the existing pendingItems iteration sequence to pass through only the relevant children.
+    const items = this.pendingTestItemIterator(currentChildren)
+    for (const item of items) {
+      yield item
+    }
+  }
+
+  /**
+   * Iterates through all pending test cases, ordered by TestItemType.
+   * The pending status will be checked immediately prior to yielding.
+   * @param allItems All test items to be visited in this iteration sequence, organized their TestItemType.
+   */
+  private *pendingTestItemIterator(
+    allItems: Map<TestItemType, vscode.TestItem[]>
+  ) {
     for (const key of Object.keys(TestItemType)) {
       const testItemType = TestItemType[key]
-      const testItems = this.allTests.get(testItemType)
+      const testItems = allItems.get(testItemType)
       if (testItems) {
         for (const item of testItems) {
           if (this.status.get(item) === TestCaseStatus.Pending) {

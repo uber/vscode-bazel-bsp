@@ -2,7 +2,7 @@ import * as vscode from 'vscode'
 import {Inject, OnModuleInit} from '@nestjs/common'
 
 import {EXTENSION_CONTEXT_TOKEN} from '../custom-providers'
-import {TestCaseInfo} from './test-info'
+import {TestCaseInfo} from '../test-info/test-info'
 
 export class TestCaseStore implements OnModuleInit, vscode.Disposable {
   @Inject(EXTENSION_CONTEXT_TOKEN) private readonly ctx: vscode.ExtensionContext

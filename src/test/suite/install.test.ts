@@ -19,6 +19,8 @@ import {Utils} from '../../utils/utils'
 import {createSampleMessageConnection} from './test-utils'
 import {BazelBSPInstaller} from '../../server/install'
 import * as settings from '../../utils/settings'
+import {TestItemFactory} from '../../test-info/test-item-factory'
+import {TestCaseStore} from '../../test-explorer/store'
 
 suite('BSP Installer', () => {
   let ctx: vscode.ExtensionContext

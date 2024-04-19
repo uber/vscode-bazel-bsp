@@ -24,6 +24,7 @@ import {
 import {TestItem} from 'vscode'
 import {RunTrackerFactory} from '../../test-runner/run-factory'
 import * as bsp from '../../bsp/bsp'
+import {TestItemFactory} from '../../test-info/test-item-factory'
 
 suite('Test Runner', () => {
   let ctx: vscode.ExtensionContext
@@ -51,6 +52,7 @@ suite('Test Runner', () => {
         TestResolver,
         TestRunner,
         RunTrackerFactory,
+        TestItemFactory,
       ],
     })
       .useMocker(token => {

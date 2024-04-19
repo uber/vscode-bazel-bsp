@@ -1,12 +1,24 @@
 import * as vscode from 'vscode'
 import * as assert from 'assert'
 import sinon from 'sinon'
-import {TestCaseInfo, TestItemType} from '../../test-explorer/test-info'
-import {BuildTargetIdentifier, StatusCode, TestResult} from '../../bsp/bsp'
+import {
+  BuildTargetTestCaseInfo,
+  TestCaseInfo,
+  TestItemType,
+} from '../../test-info/test-info'
+import {BuildTarget, StatusCode, TestResult} from '../../bsp/bsp'
 import {TestCaseStatus, TestRunTracker} from '../../test-runner/run-tracker'
 import {beforeEach, afterEach} from 'mocha'
 
 suite('TestInfo', () => {
+  const sampleTarget: BuildTarget = {
+    id: {uri: '//sample/target:test'},
+    tags: [],
+    languageIds: [],
+    dependencies: [],
+    capabilities: {},
+  }
+
   let testController: vscode.TestController
   const sandbox = sinon.createSandbox()
   beforeEach(() => {
@@ -18,21 +30,14 @@ suite('TestInfo', () => {
 
   afterEach(() => {
     testController.dispose()
-    sandbox.reset()
+    sandbox.restore()
   })
 
   suite('Test Run Params', () => {
     test('params for Bazel target', async () => {
       const testItem = testController.createTestItem('sample', 'sample')
-      const sampleTarget: BuildTargetIdentifier = {
-        uri: '//sample/target:test',
-      }
-      const testInfo = new TestCaseInfo(
-        testItem,
-        TestItemType.BazelTarget,
-        [],
-        sampleTarget
-      )
+
+      const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
       const currentRun = sandbox.createStubInstance(TestRunTracker)
       sandbox.stub(currentRun, 'originName').get(() => 'sample')
       const result = testInfo.prepareTestRunParams(currentRun)
@@ -51,15 +56,7 @@ suite('TestInfo', () => {
 
     test('params for non Bazel target', async () => {
       const testItem = testController.createTestItem('sample', 'sample')
-      const sampleTarget: BuildTargetIdentifier = {
-        uri: '//sample/target:test',
-      }
-      const testInfo = new TestCaseInfo(
-        testItem,
-        TestItemType.Root,
-        [],
-        sampleTarget
-      )
+      const testInfo = new TestCaseInfo(testItem, undefined, TestItemType.Root)
 
       const currentRun = sandbox.createStubInstance(TestRunTracker)
       sandbox.stub(currentRun, 'originName').get(() => 'sample')
@@ -72,14 +69,13 @@ suite('TestInfo', () => {
     let testItem: vscode.TestItem
     let testInfo: TestCaseInfo
     let currentRun: sinon.SinonStubbedInstance<TestRunTracker>
+
     beforeEach(() => {
       testItem = testController.createTestItem('sample', 'sample')
-      const sampleTarget: BuildTargetIdentifier = {
-        uri: '//sample/target:test',
-      }
-      testInfo = new TestCaseInfo(testItem, TestItemType.Root, [], sampleTarget)
+      testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
 
       currentRun = sandbox.createStubInstance(TestRunTracker)
+      currentRun.pendingChildrenIterator.returns((function* (parent) {})())
       sandbox.stub(currentRun, 'originName').get(() => 'sample')
     })
 

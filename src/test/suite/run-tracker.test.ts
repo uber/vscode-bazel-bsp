@@ -4,8 +4,12 @@ import {beforeEach, afterEach} from 'mocha'
 import sinon from 'sinon'
 
 import {TestCaseStatus, TestRunTracker} from '../../test-runner/run-tracker'
-import {TestCaseInfo, TestItemType} from '../../test-explorer/test-info'
-import {sampleTestData} from './test-utils'
+import {
+  BuildTargetTestCaseInfo,
+  TestCaseInfo,
+  TestItemType,
+} from '../../test-info/test-info'
+import {sampleBuildTarget, sampleTestData} from './test-utils'
 import {LogMessageParams, MessageType} from '../../bsp/bsp'
 
 suite('Test Run Tracker', () => {
@@ -29,7 +33,18 @@ suite('Test Run Tracker', () => {
     const createTestItems = (parent: vscode.TestItem | undefined, items) => {
       items.forEach(item => {
         const testItem = testController.createTestItem(item.id, item.label)
-        metadata.set(testItem, new TestCaseInfo(testItem, item.type))
+
+        if (item.type === TestItemType.BazelTarget) {
+          metadata.set(
+            testItem,
+            new BuildTargetTestCaseInfo(testItem, sampleBuildTarget())
+          )
+        } else {
+          metadata.set(
+            testItem,
+            new TestCaseInfo(testItem, undefined, item.type)
+          )
+        }
 
         createdTestItems.push(testItem)
         if (parent) {
@@ -113,14 +128,9 @@ suite('Test Run Tracker', () => {
       assert.ok(itemMetadata)
       if (includedTypes.has(itemMetadata.type)) {
         // Simulate a callback that updates the status of children.
-        const passAllChildren = item =>
-          item.children.forEach(child => {
-            testRunner.updateStatus(child, TestCaseStatus.Passed)
-            if (child.children.size > 0) {
-              passAllChildren(child)
-            }
-          })
-        passAllChildren(item)
+        for (const child of testRunner.pendingChildrenIterator(item)) {
+          testRunner.updateStatus(child, TestCaseStatus.Passed)
+        }
       }
       remainingItems.delete(item)
     })

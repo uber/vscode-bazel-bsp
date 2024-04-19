@@ -19,8 +19,9 @@ import {createSampleMessageConnection} from './test-utils'
 import {MessageConnection} from 'vscode-jsonrpc'
 import {Utils} from '../../utils/utils'
 import * as bsp from '../../bsp/bsp'
-import {TestCaseInfo, TestItemType} from '../../test-explorer/test-info'
+import {TestCaseInfo, TestItemType} from '../../test-info/test-info'
 import * as settings from '../../utils/settings'
+import {TestItemFactory} from '../../test-info/test-item-factory'
 
 suite('Test Resolver', () => {
   let ctx: vscode.ExtensionContext
@@ -53,6 +54,7 @@ suite('Test Resolver', () => {
         contextProviderFactory(ctx),
         TestCaseStore,
         TestResolver,
+        TestItemFactory,
       ],
     })
       .useMocker(token => {
@@ -187,7 +189,7 @@ suite('Test Resolver', () => {
       testCaseStore.testController.items.add(root)
       testCaseStore.testCaseMetadata.set(
         root,
-        new TestCaseInfo(root, TestItemType.Root)
+        new TestCaseInfo(root, undefined, TestItemType.Root)
       )
       assert.ok(testCaseStore.testController.resolveHandler)
 
@@ -217,7 +219,7 @@ suite('Test Resolver', () => {
       testCaseStore.testController.items.add(root)
       testCaseStore.testCaseMetadata.set(
         root,
-        new TestCaseInfo(root, TestItemType.Root)
+        new TestCaseInfo(root, undefined, TestItemType.Root)
       )
       assert.ok(testCaseStore.testController.resolveHandler)
 
@@ -245,7 +247,7 @@ suite('Test Resolver', () => {
       testCaseStore.testController.items.add(root)
       testCaseStore.testCaseMetadata.set(
         root,
-        new TestCaseInfo(root, TestItemType.Root)
+        new TestCaseInfo(root, undefined, TestItemType.Root)
       )
 
       const tokenSource = new vscode.CancellationTokenSource()
@@ -269,7 +271,7 @@ suite('Test Resolver', () => {
       testCaseStore.testController.items.add(root)
       testCaseStore.testCaseMetadata.set(
         root,
-        new TestCaseInfo(root, TestItemType.Root)
+        new TestCaseInfo(root, undefined, TestItemType.Root)
       )
 
       const tokenSource = new vscode.CancellationTokenSource()

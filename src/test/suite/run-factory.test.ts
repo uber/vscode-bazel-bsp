@@ -13,10 +13,11 @@ import {
 } from '../../custom-providers'
 import {TestRunner} from '../../test-runner/runner'
 import {RunTrackerFactory} from '../../test-runner/run-factory'
-import {TestCaseInfo} from '../../test-explorer/test-info'
+import {TestCaseInfo} from '../../test-info/test-info'
 import {populateTestCaseStore} from './test-utils'
 import sinon from 'sinon'
 import {ConnectionDetailsParser} from '../../server/connection-details'
+import {TestItemFactory} from '../../test-info/test-item-factory'
 
 suite('Test Runner Factory', () => {
   let ctx: vscode.ExtensionContext
@@ -39,6 +40,7 @@ suite('Test Runner Factory', () => {
         TestRunner,
         RunTrackerFactory,
         ConnectionDetailsParser,
+        TestItemFactory,
       ],
     }).compile()
     moduleRef.init()

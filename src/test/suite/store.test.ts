@@ -14,6 +14,7 @@ import {
 import {TestRunner} from '../../test-runner/runner'
 import {RunTrackerFactory} from '../../test-runner/run-factory'
 import {ConnectionDetailsParser} from '../../server/connection-details'
+import {TestItemFactory} from '../../test-info/test-item-factory'
 
 suite('Test Controller', () => {
   let ctx: vscode.ExtensionContext
@@ -32,6 +33,7 @@ suite('Test Controller', () => {
         TestRunner,
         RunTrackerFactory,
         ConnectionDetailsParser,
+        TestItemFactory,
       ],
     }).compile()
     moduleRef.init()

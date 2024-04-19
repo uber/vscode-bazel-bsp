@@ -7,9 +7,10 @@ import {BazelBSPBuildClient} from './client'
 import {EXTENSION_CONTEXT_TOKEN} from '../custom-providers'
 import {BuildServerManager, CANCEL_ERROR_CODE} from '../server/server-manager'
 import * as bsp from '../bsp/bsp'
-import {TestCaseInfo, TestItemType} from './test-info'
+import {TestCaseInfo, TestItemType} from '../test-info/test-info'
 import {getExtensionSetting, SettingName} from '../utils/settings'
 import {Utils} from '../utils/utils'
+import {TestItemFactory} from '../test-info/test-item-factory'
 
 @Injectable()
 export class TestResolver implements OnModuleInit, vscode.Disposable {
@@ -17,6 +18,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
   @Inject(TestCaseStore) private readonly store: TestCaseStore
   @Inject(BazelBSPBuildClient) private readonly buildClient: BazelBSPBuildClient
   @Inject(BuildServerManager) private readonly buildServer: BuildServerManager
+  @Inject(TestItemFactory) private readonly testItemFactory: TestItemFactory
 
   onModuleInit() {
     this.ctx.subscriptions.push(this)
@@ -78,18 +80,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       const projectViewAbsPath = path.resolve(repoRoot, projectViewRelPath)
       projectViewUri = vscode.Uri.parse(projectViewAbsPath)
     }
-
-    const newTest = this.store.testController.createTestItem(
-      'root',
-      'Bazel Test Targets',
-      projectViewUri
-    )
-    newTest.canResolveChildren = true
-    this.store.testCaseMetadata.set(
-      newTest,
-      new TestCaseInfo(newTest, TestItemType.Root)
-    )
-    this.store.testController.items.replace([newTest])
+    this.testItemFactory.createRootTestItem(projectViewUri)
   }
 
   /**
@@ -142,19 +133,9 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
           ? vscode.Uri.parse(path.join(target.baseDirectory, buildFileName))
           : undefined
       // UI will group runs that have the same ID.
-      const newTest = this.store.testController.createTestItem(
-        target.id.uri,
-        target.displayName ?? target.id.uri,
+      const newTest = this.testItemFactory.createBuildTargetTestItem(
+        target,
         buildFileUri
-      )
-      this.store.testCaseMetadata.set(
-        newTest,
-        new TestCaseInfo(
-          newTest,
-          TestItemType.BazelTarget,
-          target.languageIds,
-          target.id
-        )
       )
       updatedTestCases.push(newTest)
     })
