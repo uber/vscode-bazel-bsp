@@ -12,10 +12,21 @@
 			"args": [
 				"--extensionDevelopmentPath=${workspaceFolder}"
 			],
-			"outFiles": [
-				"${workspaceFolder}/build/**/*.js"
+			"outFiles": ["${workspaceFolder}/dist/**/*.js"],
+			"preLaunchTask": "npm: compile"
+		},
+		{
+			"name": "Extension Tests",
+			"type": "extensionHost",
+			"request": "launch",
+			"runtimeExecutable": "${execPath}",
+			"args": [
+			  "--extensionDevelopmentPath=${workspaceFolder}",
+			  "--extensionTestsPath=${workspaceFolder}/build/test/suite/index",
+			  "--disable-extensions"
 			],
-			"preLaunchTask": "${defaultBuildTask}"
-		}
+			"outFiles": ["${workspaceFolder}/build/test/**/*.js"],
+			"preLaunchTask": "npm: test-compile"
+		  }
 	]
 }
