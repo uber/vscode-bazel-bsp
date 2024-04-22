@@ -19,7 +19,11 @@ import {createSampleMessageConnection} from './test-utils'
 import {MessageConnection} from 'vscode-jsonrpc'
 import {Utils} from '../../utils/utils'
 import * as bsp from '../../bsp/bsp'
-import {TestCaseInfo, TestItemType} from '../../test-info/test-info'
+import {
+  BuildTargetTestCaseInfo,
+  TestCaseInfo,
+  TestItemType,
+} from '../../test-info/test-info'
 import * as settings from '../../utils/settings'
 import {TestItemFactory} from '../../test-info/test-item-factory'
 
@@ -131,6 +135,23 @@ suite('Test Resolver', () => {
       ],
     }
 
+    const sampleSourceItemsResult = (
+      target: bsp.BuildTarget
+    ): bsp.SourcesResult => {
+      return {
+        items: [
+          {
+            target: target.id,
+            sources: [
+              {uri: 'a', kind: bsp.SourceItemKind.File, generated: false},
+              {uri: 'b', kind: bsp.SourceItemKind.File, generated: false},
+              {uri: 'c', kind: bsp.SourceItemKind.File, generated: false},
+            ],
+          },
+        ],
+      }
+    }
+
     beforeEach(() => {
       testCaseStore.onModuleInit()
       testResolver.onModuleInit()
@@ -233,6 +254,30 @@ suite('Test Resolver', () => {
       } catch (e) {
         assert.ok(e instanceof Error)
       }
+    })
+
+    test('source files within a target', async () => {
+      const buildTarget = sampleBuildTargetsResult.targets[0]
+      const sendRequestStub = sandbox
+        .stub(sampleConn, 'sendRequest')
+        .returns(Promise.resolve(sampleSourceItemsResult(buildTarget)))
+
+      const targetTestItem = testCaseStore.testController.createTestItem(
+        'sample',
+        'Sample target test item'
+      )
+      testCaseStore.testController.items.add(targetTestItem)
+      testCaseStore.testCaseMetadata.set(
+        targetTestItem,
+        new BuildTargetTestCaseInfo(targetTestItem, buildTarget)
+      )
+      assert.ok(testCaseStore.testController.resolveHandler)
+
+      await testCaseStore.testController.resolveHandler(targetTestItem)
+      assert.equal(targetTestItem.children.size, 3)
+      targetTestItem.children.forEach(child => {
+        assert.ok(testCaseStore.testCaseMetadata.get(child))
+      })
     })
 
     test('refresh success', async () => {

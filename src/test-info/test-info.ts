@@ -105,3 +105,16 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
     }
   }
 }
+
+/**
+ * Test case information for a source file within a target.
+ * Current behavior is identical to BuildTargetTestCaseInfo, but in the future this can add filtering by file.
+ */
+export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
+  public readonly type: TestItemType
+
+  constructor(test: vscode.TestItem, target: BuildTarget) {
+    super(test, target)
+    this.type = TestItemType.SourceFile
+  }
+}

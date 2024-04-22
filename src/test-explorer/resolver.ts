@@ -50,6 +50,9 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       case TestItemType.Root:
         await this.resolveTargets(parentTest, cancellationToken)
         break
+      case TestItemType.BazelTarget:
+        await this.resolveSourceFiles(parentTest, cancellationToken)
+        break
     }
   }
 
@@ -148,6 +151,44 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     // Replace all children with the newly returned test cases.
     parentTest.children.replace(updatedTestCases)
     updateDescription(parentTest)
+  }
+
+  /**
+   * Request source items for a target and populate within the tree.
+   * @param parentTest TestItem to which newly found test items will be added.
+   * @param cancellationToken Cancellation token to stop the request.
+   */
+  private async resolveSourceFiles(
+    parentTest: vscode.TestItem,
+    cancellationToken?: vscode.CancellationToken
+  ) {
+    const conn = await this.buildServer.getConnection()
+
+    const parentMetadata: TestCaseInfo | undefined =
+      this.store.testCaseMetadata.get(parentTest)
+    if (!parentMetadata?.target) return
+
+    const parentTarget = parentMetadata.target
+    const params: bsp.SourcesParams = {
+      targets: [parentTarget.id],
+    }
+    const result = await conn.sendRequest(
+      bsp.BuildTargetSources.type,
+      params,
+      cancellationToken
+    )
+
+    const updatedTestCases: vscode.TestItem[] = []
+    result.items.forEach(target => {
+      target.sources.forEach(source => {
+        const newTest = this.testItemFactory.createSourceFileTestItem(
+          parentTarget,
+          source
+        )
+        updatedTestCases.push(newTest)
+      })
+    })
+    parentTest.children.replace(updatedTestCases)
   }
 }
 

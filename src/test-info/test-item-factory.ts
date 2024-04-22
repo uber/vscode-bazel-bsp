@@ -1,11 +1,17 @@
 import * as vscode from 'vscode'
 import {Inject} from '@nestjs/common'
 import {TestItem} from 'vscode'
+import path from 'path'
 
 import {EXTENSION_CONTEXT_TOKEN} from '../custom-providers'
 import {TestCaseStore} from '../test-explorer/store'
-import {BuildTargetTestCaseInfo, TestCaseInfo, TestItemType} from './test-info'
-import {BuildTarget} from '../bsp/bsp'
+import {
+  BuildTargetTestCaseInfo,
+  SourceFileTestCaseInfo,
+  TestCaseInfo,
+  TestItemType,
+} from './test-info'
+import {BuildTarget, SourceItem} from '../bsp/bsp'
 
 /**
  * Class which includes various methods to create test items.
@@ -51,6 +57,34 @@ export class TestItemFactory {
       newTest,
       new BuildTargetTestCaseInfo(newTest, target)
     )
+    newTest.canResolveChildren = true
+    return newTest
+  }
+
+  /**
+   * Creates a test item for a source file.
+   * @param target BuildTarget corresponding to this test.
+   * @param sourceItem SourceItem corresponding to this test.
+   * @returns The newly created test item.
+   */
+  createSourceFileTestItem(
+    target: BuildTarget,
+    sourceItem: SourceItem
+  ): TestItem {
+    const label = target?.baseDirectory
+      ? path.relative(target.baseDirectory, sourceItem.uri)
+      : sourceItem.uri
+    // TODO(IDE-960): Nesting source files by directory to avoid showing long directory paths.
+    const newTest = this.store.testController.createTestItem(
+      sourceItem.uri,
+      label,
+      vscode.Uri.parse(sourceItem.uri)
+    )
+    this.store.testCaseMetadata.set(
+      newTest,
+      new SourceFileTestCaseInfo(newTest, target)
+    )
+
     return newTest
   }
 }
