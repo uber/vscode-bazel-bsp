@@ -91,17 +91,18 @@ export class BazelBSPBuildClient
     }
 
     // Use "Developer -> Set log level..." to control the level of logging that will be displayed.
+    const message = Utils.removeAnsiEscapeCodes(params.message)
     switch (params.type) {
       case bsp.MessageType.Error:
-        this.clientOutputChannel.error(params.message)
+        this.clientOutputChannel.error(message)
         break
       case bsp.MessageType.Warning:
-        this.clientOutputChannel.warn(params.message)
+        this.clientOutputChannel.warn(message)
         break
       case bsp.MessageType.Info:
       case bsp.MessageType.Log:
       default:
-        this.clientOutputChannel.info(params.message)
+        this.clientOutputChannel.info(message)
         break
     }
   }

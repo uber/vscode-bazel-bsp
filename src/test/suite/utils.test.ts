@@ -55,6 +55,50 @@ suite('Utils Test Suite', () => {
     const result = Utils.getWorkspaceRoot()
     assert.strictEqual(result?.toString(), uri.toString())
   })
+
+  test('removeAnsiEscapeCodes', async () => {
+    const testCases = [
+      {
+        input: '\x1b[31mRed Text\x1b[0m',
+        expected: 'Red Text',
+        scenario: 'Color Code Removal',
+      },
+      {
+        input: '\x1b[1mBold\x1b[0m and \x1b[4mUnderlined\x1b[0m',
+        expected: 'Bold and Underlined',
+        scenario: 'Text Formatting Removal',
+      },
+      {
+        input: '\x1b[2J\x1b[;H',
+        expected: '',
+        scenario: 'Complex Sequence Handling',
+      },
+      {
+        input: '\x1b]0;Custom Title\x07',
+        expected: '',
+        scenario: 'Custom Escape Sequence Removal',
+      },
+      {
+        input: '\x1b[1;31mBold and Red\x1b[0m normal \x1b]0;Title\x07',
+        expected: 'Bold and Red normal ',
+        scenario: 'Mixed Sequences Removal',
+      },
+      {
+        input: 'Just plain text without any escapes',
+        expected: 'Just plain text without any escapes',
+        scenario: 'No Escape Sequences',
+      },
+    ]
+
+    // Iterate through each test case and assert conditions
+    testCases.forEach(({input, expected, scenario}) => {
+      assert.strictEqual(
+        Utils.removeAnsiEscapeCodes(input),
+        expected,
+        `Scenario failed: ${scenario}`
+      )
+    })
+  })
 })
 
 suite('Deferred Promise Test Suite', () => {

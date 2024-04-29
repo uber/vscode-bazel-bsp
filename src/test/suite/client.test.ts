@@ -126,54 +126,92 @@ suite('Build Client', () => {
 
   test('onBuildLogMessage', async () => {
     const sampleOriginId = 'myTask'
-    const sampleParams: bsp.LogMessageParams[] = [
+
+    type sampleMessage = {
+      params: bsp.LogMessageParams
+      // If the final message should be different, this may be set.
+      expectedMessage?: string
+    }
+    const sampleMessages: sampleMessage[] = [
       {
-        type: bsp.MessageType.Error,
-        message: 'foo',
-        task: {id: 'Sample task 1'},
-        originId: '000',
+        params: {
+          type: bsp.MessageType.Error,
+          message: 'foo',
+          task: {id: 'Sample task 1'},
+          originId: '000',
+        },
       },
       {
-        type: bsp.MessageType.Warning,
-        message: 'bar',
-        task: {id: 'Sample task 1'},
-        originId: 'aaa',
+        params: {
+          type: bsp.MessageType.Warning,
+          message: 'bar',
+          task: {id: 'Sample task 1'},
+          originId: 'aaa',
+        },
       },
       {
-        type: bsp.MessageType.Log,
-        message: 'abc',
-        task: {id: 'Sample task 2'},
-        originId: '222',
+        params: {
+          type: bsp.MessageType.Log,
+          message: 'abc',
+          task: {id: 'Sample task 2'},
+          originId: '222',
+        },
       },
       {
-        type: bsp.MessageType.Info,
-        message: 'def',
-        task: {id: 'Sample task 3'},
-        originId: 'bbb',
+        params: {
+          type: bsp.MessageType.Info,
+          message: 'def',
+          task: {id: 'Sample task 3'},
+          originId: 'bbb',
+        },
       },
       {
-        type: bsp.MessageType.Error,
-        message: 'ghi',
-        task: {id: 'Sample task 4'},
-        originId: '444',
+        params: {
+          type: bsp.MessageType.Error,
+          message: 'ghi',
+          task: {id: 'Sample task 4'},
+          originId: '444',
+        },
       },
       {
-        type: bsp.MessageType.Warning,
-        message: 'jkl',
-        task: {id: 'Sample task 2'},
-        originId: '666',
+        params: {
+          type: bsp.MessageType.Warning,
+          message: 'jkl',
+          task: {id: 'Sample task 2'},
+          originId: '666',
+        },
       },
       {
-        type: bsp.MessageType.Error,
-        message: 'ghi',
-        task: {id: 'Sample task 4'},
-        originId: sampleOriginId,
+        params: {
+          type: bsp.MessageType.Error,
+          message: 'ghi',
+          task: {id: 'Sample task 4'},
+          originId: sampleOriginId,
+        },
       },
       {
-        type: bsp.MessageType.Warning,
-        message: 'jkl',
-        task: {id: 'Sample task 2'},
-        originId: sampleOriginId,
+        params: {
+          type: bsp.MessageType.Warning,
+          message: 'jkl',
+          task: {id: 'Sample task 2'},
+          originId: sampleOriginId,
+        },
+      },
+      {
+        params: {
+          type: bsp.MessageType.Warning,
+          message: '\u001B[4msample\u001B[0m',
+          task: {id: 'Sample task 2'},
+        },
+        expectedMessage: 'sample',
+      },
+      {
+        params: {
+          type: bsp.MessageType.Error,
+          message: '\u001B[1;31mother\u001B[0m',
+          task: {id: 'Sample task 10'},
+        },
+        expectedMessage: 'other',
       },
     ]
 
@@ -187,40 +225,39 @@ suite('Build Client', () => {
     const warnStub = sandbox.stub(clientOutputChannel, 'warn')
     const infoStub = sandbox.stub(clientOutputChannel, 'info')
 
-    for (const params of sampleParams) {
-      buildClient.onBuildLogMessage(params)
+    for (const item of sampleMessages) {
+      buildClient.onBuildLogMessage(item.params)
     }
 
     // Check that each method has been called for the correct set of messages.
-    const errorParams = sampleParams.filter(
-      params =>
-        params.type === bsp.MessageType.Error &&
-        params.originId !== sampleOriginId
+    const errorParams = sampleMessages.filter(
+      item =>
+        item.params.type === bsp.MessageType.Error &&
+        item.params.originId !== sampleOriginId
     )
     assert.equal(errorStub.callCount, errorParams.length)
-    errorParams.forEach(params => {
-      errorStub.calledWith(params.message)
+    errorParams.forEach(item => {
+      errorStub.calledWith(item.expectedMessage ?? item.params.message)
     })
 
-    const warnParams = sampleParams.filter(
-      params =>
-        params.type === bsp.MessageType.Error &&
-        params.originId !== sampleOriginId
+    const warnParams = sampleMessages.filter(
+      item =>
+        item.params.type === bsp.MessageType.Warning &&
+        item.params.originId !== sampleOriginId
     )
     assert.equal(warnStub.callCount, warnParams.length)
-    warnParams.forEach(params => {
-      warnStub.calledWith(params.message)
+    warnParams.forEach(item => {
+      warnStub.calledWith(item.expectedMessage ?? item.params.message)
     })
-
-    const infoParams = sampleParams.filter(
-      params =>
-        (params.type === bsp.MessageType.Info ||
-          params.type === bsp.MessageType.Log) &&
-        params.originId !== sampleOriginId
+    const infoParams = sampleMessages.filter(
+      item =>
+        (item.params.type === bsp.MessageType.Info ||
+          item.params.type === bsp.MessageType.Log) &&
+        item.params.originId !== sampleOriginId
     )
     assert.equal(infoStub.callCount, infoParams.length)
-    infoParams.forEach(params => {
-      infoStub.calledWith(params.message)
+    infoParams.forEach(item => {
+      infoStub.calledWith(item.expectedMessage ?? item.params.message)
     })
 
     // Applicable output redirected to the callback.
