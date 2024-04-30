@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import {BuildTarget, TestParams, TestResult, StatusCode} from '../bsp/bsp'
+import {TestParamsDataKind, BazelTestParamsData} from '../bsp/bsp-ext'
 import {TestCaseStatus, TestRunTracker} from '../test-runner/run-tracker'
 
 export enum TestItemType {
@@ -67,13 +68,22 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
 
   prepareTestRunParams(currentRun: TestRunTracker): TestParams | undefined {
     if (this.target === undefined) return
-    return {
+
+    const bazelParams: BazelTestParamsData = {
+      coverage:
+        currentRun.getRunProfileKind() === vscode.TestRunProfileKind.Coverage,
+    }
+    const params = {
       targets: [this.target.id],
       originId: currentRun.originName,
       arguments: [],
       environmentVariables: {},
       workingDirectory: '',
+      dataKind: TestParamsDataKind.BazelTest,
+      data: bazelParams,
     }
+
+    return params
   }
 
   processTestRunResult(currentRun: TestRunTracker, result: TestResult): void {

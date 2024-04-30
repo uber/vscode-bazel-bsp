@@ -38,6 +38,15 @@ export class TestRunner implements OnModuleInit, vscode.Disposable {
     )
     this.ctx.subscriptions.push(mainRunProfile)
     this.runProfiles.set(vscode.TestRunProfileKind.Run, mainRunProfile)
+
+    const coverageRunProfile =
+      this.testCaseStore.testController.createRunProfile(
+        'Run with Coverage',
+        vscode.TestRunProfileKind.Coverage,
+        this.runHandler.bind(this)
+      )
+    this.ctx.subscriptions.push(coverageRunProfile)
+    this.runProfiles.set(vscode.TestRunProfileKind.Coverage, coverageRunProfile)
   }
 
   private async runHandler(

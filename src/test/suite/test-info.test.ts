@@ -9,6 +9,7 @@ import {
 import {BuildTarget, StatusCode, TestResult} from '../../bsp/bsp'
 import {TestCaseStatus, TestRunTracker} from '../../test-runner/run-tracker'
 import {beforeEach, afterEach} from 'mocha'
+import {TestParamsDataKind} from '../../bsp/bsp-ext'
 
 suite('TestInfo', () => {
   const sampleTarget: BuildTarget = {
@@ -35,23 +36,54 @@ suite('TestInfo', () => {
 
   suite('Test Run Params', () => {
     test('params for Bazel target', async () => {
-      const testItem = testController.createTestItem('sample', 'sample')
-
-      const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
-      const currentRun = sandbox.createStubInstance(TestRunTracker)
-      sandbox.stub(currentRun, 'originName').get(() => 'sample')
-      const result = testInfo.prepareTestRunParams(currentRun)
-      assert.deepStrictEqual(result, {
-        arguments: [],
-        environmentVariables: {},
-        originId: 'sample',
-        targets: [
-          {
-            uri: '//sample/target:test',
+      const testCases = [
+        {
+          profile: vscode.TestRunProfileKind.Run,
+          expectedResult: {
+            arguments: [],
+            environmentVariables: {},
+            originId: 'sample',
+            targets: [
+              {
+                uri: '//sample/target:test',
+              },
+            ],
+            workingDirectory: '',
+            dataKind: TestParamsDataKind.BazelTest,
+            data: {
+              coverage: false,
+            },
           },
-        ],
-        workingDirectory: '',
-      })
+        },
+        {
+          profile: vscode.TestRunProfileKind.Coverage,
+          expectedResult: {
+            arguments: [],
+            environmentVariables: {},
+            originId: 'sample',
+            targets: [
+              {
+                uri: '//sample/target:test',
+              },
+            ],
+            workingDirectory: '',
+            dataKind: TestParamsDataKind.BazelTest,
+            data: {
+              coverage: true,
+            },
+          },
+        },
+      ]
+
+      const testItem = testController.createTestItem('sample', 'sample')
+      const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
+      for (const testCase of testCases) {
+        const currentRun = sandbox.createStubInstance(TestRunTracker)
+        sandbox.stub(currentRun, 'originName').get(() => 'sample')
+        currentRun.getRunProfileKind.returns(testCase.profile)
+        const result = testInfo.prepareTestRunParams(currentRun)
+        assert.deepStrictEqual(result, testCase.expectedResult)
+      }
     })
 
     test('params for non Bazel target', async () => {

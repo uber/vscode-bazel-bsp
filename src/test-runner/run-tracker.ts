@@ -144,6 +144,10 @@ export class TestRunTracker implements TaskOriginHandlers {
     this.onDoneCallback = callback
   }
 
+  public getRunProfileKind(): vscode.TestRunProfileKind | undefined {
+    return this.request.profile?.kind
+  }
+
   /**
    * Collects and stores the parents and all children to be included in this test run.
    * Populates maps to group the test items by their TestItemType and current status.

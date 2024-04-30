@@ -4,6 +4,7 @@ import {Test} from '@nestjs/testing'
 import {beforeEach, afterEach} from 'mocha'
 import sinon from 'sinon'
 import {MessageConnection} from 'vscode-jsonrpc'
+import {TestParamsDataKind} from '../../bsp/bsp-ext'
 
 import {BazelBSPBuildClient} from '../../test-explorer/client'
 import {TestCaseStore} from '../../test-explorer/store'
@@ -80,7 +81,7 @@ suite('Test Runner', () => {
   test('onModuleInit', async () => {
     await testRunner.onModuleInit()
     assert.ok(testRunner.runProfiles.get(vscode.TestRunProfileKind.Run))
-    assert.equal(ctx.subscriptions.length, 2)
+    assert.equal(ctx.subscriptions.length, 3)
   })
 
   test('Test Run', async () => {
@@ -104,6 +105,35 @@ suite('Test Runner', () => {
       new vscode.CancellationTokenSource().token
     )
     assert.equal(connStub.callCount, 2)
+  })
+
+  test('Test Run with Coverage', async () => {
+    await testRunner.onModuleInit()
+    const runProfile = testRunner.runProfiles.get(
+      vscode.TestRunProfileKind.Coverage
+    )
+    assert.ok(runProfile)
+
+    const sampleResult: bsp.TestResult = {
+      statusCode: bsp.StatusCode.Ok,
+    }
+    const connStub = sinon
+      .stub(sampleConn, 'sendRequest')
+      .returns(Promise.resolve(sampleResult))
+
+    const requestedTestItems: TestItem[] = []
+    testCaseStore.testController.items.forEach(item => {
+      requestedTestItems.push(item)
+    })
+    await runProfile.runHandler(
+      {include: requestedTestItems, exclude: [], profile: runProfile},
+      new vscode.CancellationTokenSource().token
+    )
+    assert.equal(connStub.callCount, 2)
+    for (const callArgs of connStub.args) {
+      assert.ok(callArgs[1].data.coverage)
+      assert.strictEqual(callArgs[1].dataKind, TestParamsDataKind.BazelTest)
+    }
   })
 
   test('Test Run with Cancel', async () => {
