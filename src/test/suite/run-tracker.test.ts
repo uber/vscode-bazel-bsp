@@ -11,6 +11,7 @@ import {
 } from '../../test-info/test-info'
 import {sampleBuildTarget, sampleTestData} from './test-utils'
 import {LogMessageParams, MessageType} from '../../bsp/bsp'
+import {CoverageTracker} from '../../coverage-utils/coverage-tracker'
 
 suite('Test Run Tracker', () => {
   let testRunner: TestRunTracker
@@ -67,13 +68,15 @@ suite('Test Run Tracker', () => {
     cancelTokenSource = new vscode.CancellationTokenSource()
 
     const run = testController.createTestRun(request)
+    const coverageTracker = new CoverageTracker()
     runSpy = sandbox.spy(run)
     testRunner = new TestRunTracker(
       metadata,
       run,
       request,
       'sample',
-      cancelTokenSource.token
+      cancelTokenSource.token,
+      coverageTracker
     )
   })
 
@@ -170,12 +173,14 @@ suite('Test Run Tracker', () => {
   test('execute run with empty request', async () => {
     const request = new vscode.TestRunRequest([])
     const run = testController.createTestRun(request)
+    const coverageTracker = new CoverageTracker()
     const emptyTestRunner = new TestRunTracker(
       metadata,
       run,
       request,
       'sample',
-      cancelTokenSource.token
+      cancelTokenSource.token,
+      coverageTracker
     )
 
     await emptyTestRunner.executeRun(async item => {

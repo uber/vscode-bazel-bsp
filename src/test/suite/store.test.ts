@@ -15,6 +15,7 @@ import {TestRunner} from '../../test-runner/runner'
 import {RunTrackerFactory} from '../../test-runner/run-factory'
 import {ConnectionDetailsParser} from '../../server/connection-details'
 import {TestItemFactory} from '../../test-info/test-item-factory'
+import {CoverageTracker} from '../../coverage-utils/coverage-tracker'
 
 suite('Test Controller', () => {
   let ctx: vscode.ExtensionContext
@@ -34,6 +35,7 @@ suite('Test Controller', () => {
         RunTrackerFactory,
         ConnectionDetailsParser,
         TestItemFactory,
+        CoverageTracker,
       ],
     }).compile()
     moduleRef.init()

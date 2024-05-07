@@ -1,0 +1,22 @@
+SF:my/example/project/src/main/java/com/sample/project/model/common/ResourceType.java
+FN:3,com/sample/project/model/common/ResourceType::<clinit> ()V
+FNDA:1,com/sample/project/model/common/ResourceType::<clinit> ()V
+FNF:1
+FNH:1
+DA:3,1
+DA:4,1
+DA:5,1
+LH:3
+LF:3
+end_of_record
+SF:my/example/project/src/main/java/com/sample/project/model/common/Status.java
+FN:3,com/sample/project/model/common/Status::<clinit> ()V
+FNDA:1,com/sample/project/model/common/Status::<clinit> ()V
+FNF:1
+FNH:1
+DA:3,1
+DA:4,1
+DA:5,1
+LH:3
+LF:3
+end_of_record

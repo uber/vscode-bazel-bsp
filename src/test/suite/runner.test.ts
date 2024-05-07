@@ -26,6 +26,7 @@ import {TestItem} from 'vscode'
 import {RunTrackerFactory} from '../../test-runner/run-factory'
 import * as bsp from '../../bsp/bsp'
 import {TestItemFactory} from '../../test-info/test-item-factory'
+import {CoverageTracker} from '../../coverage-utils/coverage-tracker'
 
 suite('Test Runner', () => {
   let ctx: vscode.ExtensionContext
@@ -54,6 +55,7 @@ suite('Test Runner', () => {
         TestRunner,
         RunTrackerFactory,
         TestItemFactory,
+        CoverageTracker,
       ],
     })
       .useMocker(token => {

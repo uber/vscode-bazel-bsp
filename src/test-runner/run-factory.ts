@@ -5,11 +5,13 @@ import {Inject, Injectable} from '@nestjs/common'
 import {TestCaseStore} from '../test-explorer/store'
 import {TestRunTracker} from './run-tracker'
 import {BazelBSPBuildClient} from '../test-explorer/client'
+import {CoverageTracker} from '../coverage-utils/coverage-tracker'
 
 @Injectable()
 export class RunTrackerFactory {
   @Inject(TestCaseStore) private readonly testCaseStore: TestCaseStore
   @Inject(BazelBSPBuildClient) private readonly buildClient: BazelBSPBuildClient
+  @Inject(CoverageTracker) private readonly coverageTracker: CoverageTracker
 
   /**
    * Creates a new test run tracker, and register it with the build client.
@@ -27,7 +29,8 @@ export class RunTrackerFactory {
       run,
       request,
       originId,
-      cancelToken
+      cancelToken,
+      this.coverageTracker
     )
 
     this.buildClient.registerOriginHandlers(originId, requestTracker)

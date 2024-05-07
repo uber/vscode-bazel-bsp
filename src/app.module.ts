@@ -12,6 +12,7 @@ import {RunTrackerFactory} from './test-runner/run-factory'
 import {ConnectionDetailsParser} from './server/connection-details'
 import {BazelBSPInstaller} from './server/install'
 import {TestItemFactory} from './test-info/test-item-factory'
+import {CoverageTracker} from './coverage-utils/coverage-tracker'
 
 export async function bootstrap(context: vscode.ExtensionContext) {
   // Define the application's dependencies.  This is done at runtime to allow for dynamically created providers such as extension context.
@@ -30,6 +31,7 @@ export async function bootstrap(context: vscode.ExtensionContext) {
       ConnectionDetailsParser,
       BazelBSPInstaller,
       TestItemFactory,
+      CoverageTracker,
     ],
   })
   class AppModule {}

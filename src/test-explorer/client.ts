@@ -15,6 +15,9 @@ const SUPPORTED_LANGUAGES = ['java', 'scala', 'kotlin', 'python']
  */
 export type TaskOriginHandlers = {
   onBuildLogMessage?: (params: bsp.LogMessageParams) => void
+  onBuildTaskStart?: (params: bsp.TaskStartParams) => void
+  onBuildTaskProgress?: (params: bsp.TaskProgressParams) => void
+  onBuildTaskFinish?: (params: bsp.TaskFinishParams) => void
 }
 
 @Injectable()
@@ -116,14 +119,41 @@ export class BazelBSPBuildClient
   }
 
   onBuildTaskStart(params: bsp.TaskStartParams): void {
+    if (params.originId) {
+      // Intercept if a custom handler is registered for this origidId and method.
+      const handler = this.originHandlers.get(params.originId)
+      if (handler && handler.onBuildTaskStart) {
+        handler.onBuildTaskStart(params)
+        return
+      }
+    }
+
     this.clientOutputChannel.trace(JSON.stringify(params))
   }
 
   onBuildTaskProgress(params: bsp.TaskProgressParams): void {
+    if (params.originId) {
+      // Intercept if a custom handler is registered for this origidId and method.
+      const handler = this.originHandlers.get(params.originId)
+      if (handler && handler.onBuildTaskProgress) {
+        handler.onBuildTaskProgress(params)
+        return
+      }
+    }
+
     this.clientOutputChannel.trace(JSON.stringify(params))
   }
 
   onBuildTaskFinish(params: bsp.TaskFinishParams): void {
+    if (params.originId) {
+      // Intercept if a custom handler is registered for this origidId and method.
+      const handler = this.originHandlers.get(params.originId)
+      if (handler && handler.onBuildTaskFinish) {
+        handler.onBuildTaskFinish(params)
+        return
+      }
+    }
+
     this.clientOutputChannel.trace(JSON.stringify(params))
   }
 

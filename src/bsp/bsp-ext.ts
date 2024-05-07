@@ -9,3 +9,11 @@ export namespace TestParamsDataKind {
 export interface BazelTestParamsData {
   coverage?: boolean
 }
+
+export namespace TaskProgressDataKind {
+  export const CoverageReport = 'coverage-report'
+}
+
+export interface TestCoverageReport {
+  lcovReportUri: string
+}

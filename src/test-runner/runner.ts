@@ -10,6 +10,7 @@ import {TestCaseStatus} from './run-tracker'
 import {MessageConnection} from 'vscode-jsonrpc'
 import {TestRunTracker} from './run-tracker'
 import {RunTrackerFactory} from './run-factory'
+import {CoverageTracker} from '../coverage-utils/coverage-tracker'
 
 @Injectable()
 export class TestRunner implements OnModuleInit, vscode.Disposable {
@@ -18,6 +19,7 @@ export class TestRunner implements OnModuleInit, vscode.Disposable {
   @Inject(BazelBSPBuildClient) private readonly buildClient: BazelBSPBuildClient
   @Inject(BuildServerManager) private readonly buildServer: BuildServerManager
   @Inject(RunTrackerFactory) private readonly runFactory: RunTrackerFactory
+  @Inject(CoverageTracker) private readonly coverageTracker: CoverageTracker
 
   runProfiles: Map<vscode.TestRunProfileKind, vscode.TestRunProfile>
 
@@ -31,6 +33,7 @@ export class TestRunner implements OnModuleInit, vscode.Disposable {
   private setupRunProfiles() {
     this.runProfiles = new Map()
 
+    // Main run profile
     const mainRunProfile = this.testCaseStore.testController.createRunProfile(
       'Run',
       vscode.TestRunProfileKind.Run,
@@ -39,6 +42,7 @@ export class TestRunner implements OnModuleInit, vscode.Disposable {
     this.ctx.subscriptions.push(mainRunProfile)
     this.runProfiles.set(vscode.TestRunProfileKind.Run, mainRunProfile)
 
+    // Coverage run profile
     const coverageRunProfile =
       this.testCaseStore.testController.createRunProfile(
         'Run with Coverage',
@@ -47,6 +51,8 @@ export class TestRunner implements OnModuleInit, vscode.Disposable {
       )
     this.ctx.subscriptions.push(coverageRunProfile)
     this.runProfiles.set(vscode.TestRunProfileKind.Coverage, coverageRunProfile)
+    coverageRunProfile.loadDetailedCoverage =
+      this.coverageTracker.loadDetailedCoverage.bind(this.coverageTracker)
   }
 
   private async runHandler(

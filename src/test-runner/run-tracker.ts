@@ -1,8 +1,10 @@
 import * as vscode from 'vscode'
 
 import {TestCaseInfo, TestItemType} from '../test-info/test-info'
-import {LogMessageParams} from '../bsp/bsp'
+import {LogMessageParams, TaskProgressParams} from '../bsp/bsp'
 import {TaskOriginHandlers} from '../test-explorer/client'
+import {TaskProgressDataKind, TestCoverageReport} from '../bsp/bsp-ext'
+import {CoverageTracker} from '../coverage-utils/coverage-tracker'
 
 export enum TestCaseStatus {
   Pending,
@@ -26,13 +28,16 @@ export class TestRunTracker implements TaskOriginHandlers {
   private _originName: string
   private onDoneCallback: () => void
   private cancelToken: vscode.CancellationToken
+  private coverageTracker: CoverageTracker
+  private pending: Thenable<void>[] = []
 
   constructor(
     testCaseMetadata: WeakMap<vscode.TestItem, TestCaseInfo>,
     run: vscode.TestRun,
     request: vscode.TestRunRequest,
     originName: string,
-    cancelToken: vscode.CancellationToken
+    cancelToken: vscode.CancellationToken,
+    coverageTracker: CoverageTracker
   ) {
     this.allTests = new Map<TestItemType, vscode.TestItem[]>()
     this.status = new Map<vscode.TestItem, TestCaseStatus>()
@@ -41,6 +46,7 @@ export class TestRunTracker implements TaskOriginHandlers {
     this.request = request
     this._originName = originName
     this.cancelToken = cancelToken
+    this.coverageTracker = coverageTracker
 
     this.prepareCurrentRun()
   }
@@ -87,6 +93,8 @@ export class TestRunTracker implements TaskOriginHandlers {
         this.updateStatus(item, TestCaseStatus.Skipped)
       }
     }
+
+    await Promise.all(this.pending)
     this.run.end()
     if (this.onDoneCallback) this.onDoneCallback()
   }
@@ -138,9 +146,22 @@ export class TestRunTracker implements TaskOriginHandlers {
   }
 
   /**
+   * Collects selected info that may be reported via progress events.
+   * @param params Progress event containing data to be collected.
+   */
+  public onBuildTaskProgress(params: TaskProgressParams): void {
+    if (params.dataKind === TaskProgressDataKind.CoverageReport) {
+      const data = params.data as TestCoverageReport
+      this.pending.push(
+        this.coverageTracker.handleCoverageReport(this.run, data.lcovReportUri)
+      )
+    }
+  }
+
+  /**
    * Registers a callback that will be called after the last test item in the run has been processed.
    */
-  public onDone(callback: () => void) {
+  public async onDone(callback: () => void) {
     this.onDoneCallback = callback
   }
 
