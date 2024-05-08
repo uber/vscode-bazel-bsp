@@ -18,6 +18,7 @@ In the future, we may consider exploring other areas of the Build Server Protoco
 2. In VS Code's Extensions panel, navigate to the context menu (small ... at the top right of the panel), and select "Install Extension from VSIX..."
 3. Select the location of the .vsix file, install it, and reload.
 4. The "Testing" panel will become enabled once you open a supported file type. See activation events in the package.json for current list.
+The extension is still under development - once it is end-user ready, we will offer versioned releasees on this repo and the VS Code Extension Marketplace.
 
 ## Getting Started
 1. Launch this extension and open a supported file type.
