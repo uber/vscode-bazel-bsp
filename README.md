@@ -1,9 +1,5 @@
 # vscode-bazel-bsp README
 
-This is the README for VS Code + Bazel BSP Extension.
-
-## Features
-
 This extension is designed to provide integration between VS Code and Bazel BSP.  It is inspired by the [New Bazel Plugin](https://lp.jetbrains.com/new-bazel-plugin/) for JetBrains products, allowing VS Code to leverage a subset of Bazel BSP as well.
 
 - [Build Server Protocol](https://code.visualstudio.com/api/extension-guides/testing)
@@ -16,6 +12,13 @@ The initial focus will be to build out several core workflows for to integrate B
 - Support for debugging test targets and overlay of code coverage
 
 In the future, we may consider exploring other areas of the Build Server Protocol and integrating them with VS Code.  If you have ideas, feel free to start a discussion.
+
+## Building/installing the extension
+1. On the latest main branch, run `yarn package`.  This will produce an extension artifact (.vsix file).
+2. In VS Code's Extensions panel, navigate to the context menu (small ... at the top right of the panel), and select "Install Extension from VSIX..."
+3. Select the location of the .vsix file, install it, and reload.
+4. The "Testing" panel will become enabled once you open a supported file type. See activation events in the package.json for current list.
+The extension is still under development - once it is end-user ready, we will offer versioned releasees on this repo and the VS Code Extension Marketplace.
 
 ## Getting Started
 1. Launch this extension and open a supported file type.
