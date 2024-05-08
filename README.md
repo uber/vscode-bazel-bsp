@@ -4,12 +4,12 @@ This is the README for VS Code + Bazel BSP Extension.
 
 ## Features
 
-This extension is designed to provide integration between VS Code and Bazel BSP.  It is inspired by the [New Bazel Plugin](https://lp.jetbrains.com/new-bazel-plugin/) for JetBrains products, allowing VS Code to leverage Bazel BSP as well.
+This extension is designed to provide integration between VS Code and Bazel BSP.  It is inspired by the [New Bazel Plugin](https://lp.jetbrains.com/new-bazel-plugin/) for JetBrains products, allowing VS Code to leverage a subset of Bazel BSP as well.
 
 - [Build Server Protocol](https://code.visualstudio.com/api/extension-guides/testing)
 - [Bazel BSP](https://github.com/JetBrains/bazel-bsp)
 
-The initial focus will be to build out several core workflows for to integrate Bazel BSP with VS Code's Test Explorer [Test Explorer](https://code.visualstudio.com/api/extension-guides/testing), including the following:
+The initial focus will be to build out several core workflows for to integrate Bazel BSP with VS Code's [Test Explorer](https://code.visualstudio.com/api/extension-guides/testing), including the following:
 - Server install, launch, initialization, and process management
 - Syncing available test targets and discovery of test cases beneath them
 - Execution of test targets and parsing/display of test results and run history
@@ -35,7 +35,7 @@ In the future, we may consider exploring other areas of the Build Server Protoco
 - `Bazel BSP (extension)`: Shows general extension launch related info, such as install progress and other potential issues with the extension itself.
 
 ## Requirements
-- VS Code 1.86 or newer
+- VS Code 1.89 or newer
 
 ## Extension Settings
 - Please see the `bazelbsp` section in VS Code settings.

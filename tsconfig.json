@@ -11,14 +11,19 @@
 		"rootDir": "src",
 		"strict": true,
 		"esModuleInterop": true,
-		"experimentalDecorators": true
+		"experimentalDecorators": true,
+		"baseUrl": ".",
+		"noImplicitAny": false,
+		"useUnknownInCatchVariables": false,
+		"strictPropertyInitialization": false
 	},
 	"exclude": [
 		"node_modules",
-		"build"
+		"build",
+		"dist",
 	],
 	"include": [
 		"src"
 	],
-	"extends": "../../tsconfig",
+	"extends":  "./node_modules/gts/tsconfig-google.json",
 }

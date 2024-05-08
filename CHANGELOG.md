@@ -2,8 +2,6 @@
 
 All notable changes to the "vscode-bazel-bsp" extension will be documented in this file.
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
-
 ## [Unreleased]
 
-- Initial release
+- Extension is currently in an initial iteration phase, focused on getting core test execution functionality working. Updates will be added here once we begin tracking formal releases.
