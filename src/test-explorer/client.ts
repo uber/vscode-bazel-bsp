@@ -36,6 +36,12 @@ export class BazelBSPBuildClient
     this.ctx.subscriptions.push(this)
     this.ctx.subscriptions.push(this.clientOutputChannel)
 
+    this.ctx.subscriptions.push(
+      vscode.commands.registerCommand('bazelbsp.showServerOutput', () => {
+        this.clientOutputChannel.show()
+      })
+    )
+
     const conn = await this.buildServer.getConnection()
     bsp.registerBuildClientHandlers(conn, this)
     this.initializationRequest()

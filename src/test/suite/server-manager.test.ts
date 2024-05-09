@@ -7,6 +7,7 @@ import {beforeEach, afterEach} from 'mocha'
 import * as rpc from 'vscode-jsonrpc'
 
 import {
+  PRIMARY_OUTPUT_CHANNEL_TOKEN,
   contextProviderFactory,
   outputChannelProvider,
 } from '../../custom-providers'
@@ -21,12 +22,23 @@ suite('Build Server', () => {
   let buildServer: BuildServerManager
   let spawnStub: sinon.SinonStub
   let sampleConn: rpc.MessageConnection
+  let appendLineStub: sinon.SinonStub
+  let outputChannel: vscode.LogOutputChannel
+  let appendLinePromise: Thenable<void>
 
   const sandbox = sinon.createSandbox()
 
   beforeEach(async () => {
-    let process = cp.spawn('echo', ['hello'])
+    let process = cp.spawn('echo hello; echo world >&2', {
+      shell: true,
+    })
     spawnStub = sandbox.stub(cp, 'spawn').returns(process)
+    outputChannel = vscode.window.createOutputChannel('sample', {log: true})
+    appendLinePromise = new Promise(resolve => {
+      appendLineStub = sandbox
+        .stub(outputChannel, 'appendLine')
+        .callsFake(() => resolve())
+    })
 
     sampleConn = createSampleMessageConnection()
     sandbox.stub(rpc, 'createMessageConnection').returns(sampleConn)
@@ -34,14 +46,12 @@ suite('Build Server', () => {
 
     ctx = {subscriptions: []} as unknown as vscode.ExtensionContext
     const moduleRef = await Test.createTestingModule({
-      providers: [
-        outputChannelProvider,
-        contextProviderFactory(ctx),
-        BuildServerManager,
-      ],
+      providers: [contextProviderFactory(ctx), BuildServerManager],
     })
       .useMocker(token => {
-        if (token === ConnectionDetailsParser) {
+        if (token === PRIMARY_OUTPUT_CHANNEL_TOKEN) {
+          return outputChannel
+        } else if (token === ConnectionDetailsParser) {
           return {
             getServerConnectionDetails: async (
               bspServerName: string,
@@ -66,6 +76,7 @@ suite('Build Server', () => {
 
   afterEach(() => {
     sandbox.restore()
+    ctx.subscriptions.forEach(item => item.dispose())
   })
 
   test('OnModuleInit', async () => {
@@ -82,6 +93,8 @@ suite('Build Server', () => {
     buildServer.serverLaunch()
     const conn = await buildServer.getConnection()
 
+    await appendLinePromise
+    assert.ok(appendLineStub.calledOnce)
     assert.ok(spawnStub.calledOnce)
     assert.ok(listenStub.calledOnce)
     assert.ok(conn)
