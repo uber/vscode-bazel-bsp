@@ -19,7 +19,7 @@ const SERVER_NAME = 'bazelbsp'
 export class BuildServerManager implements vscode.Disposable, OnModuleInit {
   @Inject(EXTENSION_CONTEXT_TOKEN) private readonly ctx: vscode.ExtensionContext
   @Inject(PRIMARY_OUTPUT_CHANNEL_TOKEN)
-  private readonly outputChannel: vscode.OutputChannel
+  private readonly outputChannel: vscode.LogOutputChannel
   @Inject(ConnectionDetailsParser)
   private readonly connectionDetailsParser: ConnectionDetailsParser
 
@@ -70,6 +70,11 @@ export class BuildServerManager implements vscode.Disposable, OnModuleInit {
       const cmd = connDetails.argv[0]
       const args = connDetails.argv.slice(1)
       let childProcess = cp.spawn(cmd, args, {cwd: rootDir})
+      childProcess.stderr.on('data', data => {
+        // Per BSP spec, issues with the server process are reported via stderr.
+        this.outputChannel.appendLine(`[bsp server process] ${data.toString()}`)
+      })
+
       let connection = rpc.createMessageConnection(
         new rpc.StreamMessageReader(childProcess.stdout),
         new rpc.StreamMessageWriter(childProcess.stdin)

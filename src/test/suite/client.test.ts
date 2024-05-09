@@ -64,6 +64,7 @@ suite('Build Client', () => {
   })
 
   afterEach(() => {
+    ctx.subscriptions.forEach(item => item.dispose())
     sandbox.restore()
   })
 
@@ -89,7 +90,7 @@ suite('Build Client', () => {
     const actualInitResult = await buildClient.getInitializeResult()
 
     assert.equal(actualInitResult, sampleInitResult)
-    assert.equal(ctx.subscriptions.length, 2)
+    assert.equal(ctx.subscriptions.length, 3)
 
     // Ensure that the client registers handlers for notifications/requests.
     assert.ok(onNotificationStub.callCount > 0)

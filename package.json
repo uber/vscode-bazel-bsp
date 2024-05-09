@@ -23,6 +23,11 @@
       {
         "command": "bazelbsp.install",
         "title": "Bazel BSP: Install Bazel BSP Server"
+      },
+      {
+        "command": "bazelbsp.showServerOutput",
+        "title": "Bazel BSP: Show Server Output Channel",
+        "icon": "$(output)"
       }
     ],
     "configuration": {

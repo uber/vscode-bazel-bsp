@@ -30,30 +30,54 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
 
   private async resolveHandler(
     parentTest: vscode.TestItem | undefined,
-    cancellationToken?: vscode.CancellationToken
+    testExplorerCancel?: vscode.CancellationToken
   ) {
-    if (parentTest === undefined) {
-      this.resolveRoot()
-      return
-    }
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Syncing Bazel Test Targets',
+        cancellable: true,
+      },
+      async (
+        progress: vscode.Progress<{
+          message?: string | undefined
+          increment?: number | undefined
+        }>,
+        notificationCancel: vscode.CancellationToken
+      ) => {
+        progress.report({
+          increment: -1,
+          message:
+            'Click [here](command:bazelbsp.showServerOutput) to check progress.',
+        })
+        const combinedToken = combineCancelTokens(
+          testExplorerCancel,
+          notificationCancel
+        )
+        if (parentTest === undefined) {
+          this.resolveRoot()
+          return
+        }
 
-    // Wait for initialization before attempting requests to the server.
-    updateDescription(
-      parentTest,
-      'Loading: waiting for build server initialization'
+        // Wait for initialization before attempting requests to the server.
+        updateDescription(
+          parentTest,
+          'Loading: waiting for build server initialization'
+        )
+        await this.buildClient.getInitializeResult()
+        updateDescription(parentTest)
+        const parentMetadata = this.store.testCaseMetadata.get(parentTest)
+
+        switch (parentMetadata?.type) {
+          case TestItemType.Root:
+            await this.resolveTargets(parentTest, combinedToken)
+            break
+          case TestItemType.BazelTarget:
+            await this.resolveSourceFiles(parentTest, combinedToken)
+            break
+        }
+      }
     )
-    await this.buildClient.getInitializeResult()
-    updateDescription(parentTest)
-    const parentMetadata = this.store.testCaseMetadata.get(parentTest)
-
-    switch (parentMetadata?.type) {
-      case TestItemType.Root:
-        await this.resolveTargets(parentTest, cancellationToken)
-        break
-      case TestItemType.BazelTarget:
-        await this.resolveSourceFiles(parentTest, cancellationToken)
-        break
-    }
   }
 
   /**
@@ -200,4 +224,14 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
 function updateDescription(testItem: vscode.TestItem, description?: string) {
   if (description) testItem.description = description
   else testItem.description = ''
+}
+
+function combineCancelTokens(
+  token1: vscode.CancellationToken | undefined,
+  token2: vscode.CancellationToken | undefined
+): vscode.CancellationToken {
+  const combinedSource = new vscode.CancellationTokenSource()
+  token1?.onCancellationRequested(() => combinedSource.cancel())
+  token2?.onCancellationRequested(() => combinedSource.cancel())
+  return combinedSource.token
 }
