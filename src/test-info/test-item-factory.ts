@@ -7,7 +7,9 @@ import {EXTENSION_CONTEXT_TOKEN} from '../custom-providers'
 import {TestCaseStore} from '../test-explorer/store'
 import {
   BuildTargetTestCaseInfo,
+  SourceDirTestCaseInfo,
   SourceFileTestCaseInfo,
+  TargetDirTestCaseInfo,
   TestCaseInfo,
   TestItemType,
 } from './test-info'
@@ -53,11 +55,11 @@ export class TestItemFactory {
       target.displayName ?? target.id.uri,
       uri
     )
-    this.store.testCaseMetadata.set(
-      newTest,
-      new BuildTargetTestCaseInfo(newTest, target)
-    )
+    const testCaseInfo = new BuildTargetTestCaseInfo(newTest, target)
+    this.store.testCaseMetadata.set(newTest, testCaseInfo)
+
     newTest.canResolveChildren = true
+    testCaseInfo.setDisplayName()
     return newTest
   }
 
@@ -74,7 +76,6 @@ export class TestItemFactory {
     const label = target?.baseDirectory
       ? path.relative(target.baseDirectory, sourceItem.uri)
       : sourceItem.uri
-    // TODO(IDE-960): Nesting source files by directory to avoid showing long directory paths.
     const newTest = this.store.testController.createTestItem(
       sourceItem.uri,
       label,
@@ -85,6 +86,110 @@ export class TestItemFactory {
       new SourceFileTestCaseInfo(newTest, target)
     )
 
+    return newTest
+  }
+
+  /**
+   * Creates test items representing segments of a path.
+   * @param directories Mapping of directories to test items, specific to a given refresh.
+   * @param dir Directory path (relative or absolute) which will be broken up into separate test items.
+   * @param target (optional) Target that applies to these path segments.
+   * @returns Root and base test items for the path segments.
+   */
+  createPathSegmentTestItems(
+    directories: Map<string, vscode.TestItem>,
+    dir: string,
+    target?: BuildTarget
+  ): {
+    rootTestItem: vscode.TestItem
+    baseTestItem: vscode.TestItem
+  } {
+    // Lowest child among the segments.
+    let baseItem: undefined | vscode.TestItem
+    // Prior visited item in the iteration.
+    let priorItem: undefined | vscode.TestItem
+    // Current item in the iteration.
+    let currentItem: undefined | vscode.TestItem
+
+    let currentPath = vscode.Uri.parse(dir).fsPath
+    let shouldContinue = true
+    do {
+      // Get or create test item for this directory.
+      currentItem = directories.get(currentPath)
+      if (currentItem === undefined) {
+        if (target) {
+          // When a target is provided, create this as a source directory, so it is runnable on its own.
+          currentItem = this.createSourceDirTestItem(
+            target,
+            currentPath,
+            vscode.Uri.parse(currentPath)
+          )
+        } else {
+          // When no target is provided, create it as a target directory, allowing targets beneath it to run.
+          currentItem = this.createTargetDirTestItem(
+            currentPath,
+            vscode.Uri.parse(currentPath)
+          )
+        }
+        directories.set(currentPath, currentItem)
+      }
+
+      if (priorItem) currentItem.children.add(priorItem)
+      if (!baseItem) baseItem = currentItem
+
+      // Move up the directory path
+      priorItem = currentItem
+      if (currentPath === path.dirname(currentPath)) {
+        shouldContinue = false
+      } else {
+        currentPath = path.dirname(currentPath)
+      }
+    } while (shouldContinue)
+
+    return {
+      rootTestItem: currentItem,
+      baseTestItem: baseItem,
+    }
+  }
+
+  /**
+   * Creates a test item for a build target's directory.
+   * @param dir path to this directory.
+   * @param uri URI of the test item.
+   * @returns The newly created test item.
+   */
+  private createTargetDirTestItem(dir: string, uri: vscode.Uri): TestItem {
+    const id = `{targetdir}:${uri.path}`
+    const newTest = this.store.testController.createTestItem(id, dir, uri)
+    this.store.testCaseMetadata.set(
+      newTest,
+      new TargetDirTestCaseInfo(newTest, dir)
+    )
+    return newTest
+  }
+
+  /**
+   * Creates a test item for a source directory within a build target.
+   * @param dir path to this directory
+   * @param target BuildTarget corresponding to this test.
+   * @param uri URI of the test item.
+   * @returns The newly created test item.
+   */
+  private createSourceDirTestItem(
+    target: BuildTarget,
+    dir: string,
+    uri: vscode.Uri
+  ): TestItem {
+    const id = `{sourcedir}:${target.id.uri}:${uri.path}`
+    const relPath = path.relative(
+      vscode.Uri.parse(target.baseDirectory ?? '').fsPath,
+      dir
+    )
+    const newTest = this.store.testController.createTestItem(id, relPath, uri)
+    this.store.testCaseMetadata.set(
+      newTest,
+      new SourceDirTestCaseInfo(newTest, target, relPath)
+    )
     return newTest
   }
 }
