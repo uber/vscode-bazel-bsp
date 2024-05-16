@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import * as path from 'path'
 import {BuildTarget, TestParams, TestResult, StatusCode} from '../bsp/bsp'
 import {TestParamsDataKind, BazelTestParamsData} from '../bsp/bsp-ext'
 import {TestCaseStatus, TestRunTracker} from '../test-runner/run-tracker'
@@ -6,6 +7,7 @@ import {TestCaseStatus, TestRunTracker} from '../test-runner/run-tracker'
 export enum TestItemType {
   Root,
   BazelTarget,
+  TargetDirectory,
   SourceDirectory,
   SourceFile,
   TestSuite,
@@ -52,6 +54,41 @@ export class TestCaseInfo {
       'called processTestRunResult on a test case that cannot be directly run'
     )
   }
+
+  /**
+   * Refreshes the name displayed for the test item.
+   * Base implementation leaves the label unchanged.
+   * @param relativeToItem (optional) Item against which a relative path will be calculated, for subclasses that support it.
+   */
+  setDisplayName(relativeToItem?: TestCaseInfo | undefined) {}
+}
+
+/**
+ * Test case information to represent a directory containing sources within a target.
+ */
+export class TargetDirTestCaseInfo extends TestCaseInfo {
+  private readonly dir: string
+  constructor(test: vscode.TestItem, dir: string) {
+    super(test, undefined, TestItemType.TargetDirectory)
+    this.dir = dir
+  }
+
+  /**
+   * Calculate relative path to another target directory and set it as display name.
+   * @param relativeToItem Item based on which the relative path will be calculated.
+   */
+  setDisplayName(relativeToItem?: TestCaseInfo | undefined) {
+    if (relativeToItem?.type === TestItemType.TargetDirectory) {
+      // If the relative item is another TargetDirTestCaseInfo, calculate relative path.
+      this.testItem.label = path.relative(
+        (relativeToItem as TargetDirTestCaseInfo).dir,
+        this.dir
+      )
+    } else {
+      // If it is another type of test item, use the full path.
+      this.testItem.label = this.dir
+    }
+  }
 }
 
 /**
@@ -60,10 +97,13 @@ export class TestCaseInfo {
  */
 export class BuildTargetTestCaseInfo extends TestCaseInfo {
   public readonly type: TestItemType
+  public readonly target: BuildTarget
 
   constructor(test: vscode.TestItem, target: BuildTarget) {
     super(test, target)
     this.type = TestItemType.BazelTarget
+    // This class and any that extend it are guaranteed to include a target.
+    this.target = target
   }
 
   prepareTestRunParams(currentRun: TestRunTracker): TestParams | undefined {
@@ -114,6 +154,44 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
       updateStatus(child)
     }
   }
+
+  /**
+   * Sets the display name to the target's label.
+   * @param relativeToItem will be ignored in this implementation
+   */
+  setDisplayName(relativeToItem?: TestCaseInfo | undefined) {
+    this.testItem.label =
+      this.target.id.uri.split(':').pop() ?? this.target.id.uri
+    this.testItem.description = this.target.displayName
+  }
+}
+
+/**
+ * Test case information for a source directory within a build target.
+ */
+export class SourceDirTestCaseInfo extends BuildTargetTestCaseInfo {
+  public readonly type: TestItemType
+  private readonly dir: string
+  constructor(test: vscode.TestItem, target: BuildTarget, dir: string) {
+    super(test, target)
+    this.dir = dir
+    this.type = TestItemType.SourceDirectory
+  }
+
+  /**
+   * Sets a source directory's name to be relative to any parent source directory.
+   * @param relativeToItem Item against which the label will be calculated.
+   */
+  setDisplayName(relativeToItem?: TestCaseInfo | undefined) {
+    if (relativeToItem?.type === TestItemType.SourceDirectory) {
+      this.testItem.label = path.relative(
+        (relativeToItem as SourceDirTestCaseInfo).dir,
+        this.dir
+      )
+    } else {
+      this.testItem.label = this.dir
+    }
+  }
 }
 
 /**
@@ -126,5 +204,13 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
   constructor(test: vscode.TestItem, target: BuildTarget) {
     super(test, target)
     this.type = TestItemType.SourceFile
+  }
+
+  /**
+   * Sets a source file's label to its file name.
+   * @param relativeToItem will be ignored in this implementation
+   */
+  setDisplayName(relativeToItem?: TestCaseInfo | undefined) {
+    this.testItem.label = path.basename(this.testItem.uri?.path ?? '')
   }
 }
