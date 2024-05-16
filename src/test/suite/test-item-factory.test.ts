@@ -13,7 +13,7 @@ import * as assert from 'assert'
 import {BuildTarget, SourceItem, SourceItemKind} from '../../bsp/bsp'
 import {TestItemType} from '../../test-info/test-info'
 
-suite('Test Resolver', () => {
+suite('Test Item Factory', () => {
   let ctx: vscode.ExtensionContext
   let testCaseStore: TestCaseStore
   let testItemFactory: TestItemFactory
@@ -25,6 +25,7 @@ suite('Test Resolver', () => {
     languageIds: [],
     dependencies: [],
     capabilities: {},
+    baseDirectory: 'file:///home/user/repo/root/dir',
   }
 
   beforeEach(async () => {
@@ -84,5 +85,65 @@ suite('Test Resolver', () => {
       item.uri?.fsPath,
       vscode.Uri.parse(sourceItem.uri).fsPath
     )
+  })
+
+  test('create target directory items', async () => {
+    const dirs = [
+      'file:///home/user/repo/root/dir/src/1',
+      'file:///home/user/repo/root/dir/src/2',
+      'file:///home/user/repo/root/dir/src/3',
+      'file:///home/user/repo/root/project/src/1',
+      'file:///home/user/repo/root/project/src/2',
+      'file:///home/user/repo/root/dir',
+    ]
+
+    const directories = new Map<string, vscode.TestItem>()
+    for (const dir of dirs) {
+      const results = testItemFactory.createPathSegmentTestItems(
+        directories,
+        dir
+      )
+      assert.equal(
+        results.baseTestItem.id,
+        `{targetdir}:${vscode.Uri.parse(dir).fsPath}`
+      )
+      assert.equal(
+        results.baseTestItem.uri?.fsPath,
+        `${vscode.Uri.parse(dir).fsPath}`
+      )
+      assert.equal(results.rootTestItem.id, '{targetdir}:/')
+      assert.equal(results.rootTestItem.uri?.fsPath, '/')
+    }
+  })
+
+  test('create source directory items', async () => {
+    const dirs = [
+      'file:///home/user/repo/root/dir/src/1',
+      'file:///home/user/repo/root/dir/src/2',
+      'file:///home/user/repo/root/dir/src/3',
+      'file:///home/user/repo/root/project/src/1',
+      'file:///home/user/repo/root/project/src/2',
+      'file:///home/user/repo/root/dir',
+    ]
+
+    const directories = new Map<string, vscode.TestItem>()
+    for (const dir of dirs) {
+      const results = testItemFactory.createPathSegmentTestItems(
+        directories,
+        dir,
+        sampleTarget
+      )
+
+      assert.equal(
+        results.baseTestItem.id,
+        `{sourcedir}:test:${vscode.Uri.parse(dir).fsPath}`
+      )
+      assert.equal(
+        results.baseTestItem.uri?.fsPath,
+        vscode.Uri.parse(dir).fsPath
+      )
+      assert.equal(results.rootTestItem.id, '{sourcedir}:test:/')
+      assert.equal(results.rootTestItem.uri?.fsPath, '/')
+    }
   })
 })

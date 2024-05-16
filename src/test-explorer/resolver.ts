@@ -147,13 +147,23 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
 
     updateDescription(parentTest, 'Loading: processing target results')
 
-    // TODO(IDE-960): Add optional nesting by Bazel package. Current view provides a flat view of all targets.
-
     // Process the returned targets, create new test items, and store their metadata.
-    const updatedTestCases: vscode.TestItem[] = []
+    const directories = new Map<string, vscode.TestItem>()
     const buildFileName = getExtensionSetting(SettingName.BUILD_FILE_NAME)
+    parentTest.children.replace([])
     result.targets.forEach(target => {
       if (!target.capabilities.canTest) return
+
+      let relevantParent = parentTest
+      if (target.baseDirectory) {
+        const pathSegmentTestItems =
+          this.testItemFactory.createPathSegmentTestItems(
+            directories,
+            target.baseDirectory
+          )
+        parentTest.children.add(pathSegmentTestItems.rootTestItem)
+        relevantParent = pathSegmentTestItems.baseTestItem
+      }
 
       const buildFileUri =
         target.baseDirectory && buildFileName
@@ -164,16 +174,11 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
         target,
         buildFileUri
       )
-      updatedTestCases.push(newTest)
-    })
-
-    // Clean up metadata from the prior versions of the test cases.
-    parentTest.children.forEach(item => {
-      this.store.testCaseMetadata.delete(item)
+      relevantParent.children.add(newTest)
     })
 
     // Replace all children with the newly returned test cases.
-    parentTest.children.replace(updatedTestCases)
+    this.condenseTestItems(parentTest)
     updateDescription(parentTest)
   }
 
@@ -202,17 +207,82 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       cancellationToken
     )
 
-    const updatedTestCases: vscode.TestItem[] = []
+    const directories = new Map<string, vscode.TestItem>()
+    parentTest.children.replace([])
     result.items.forEach(target => {
       target.sources.forEach(source => {
+        // Parent to which the source file's test item will be added.
+        // If the source file is in a subdirectory, the parent will be updated based on the path.
+        let relevantParent = parentTest
+
+        // If the current source is not in the target's base directory, create path segments.
+        if (
+          path.resolve(path.dirname(source.uri)) !==
+          path.resolve(parentTarget.baseDirectory ?? '')
+        ) {
+          const pathSegmentTestItems =
+            this.testItemFactory.createPathSegmentTestItems(
+              directories,
+              path.dirname(source.uri),
+              parentTarget
+            )
+          parentTest.children.add(pathSegmentTestItems.rootTestItem)
+          relevantParent = pathSegmentTestItems.baseTestItem
+        }
+
         const newTest = this.testItemFactory.createSourceFileTestItem(
           parentTarget,
           source
         )
-        updatedTestCases.push(newTest)
+        relevantParent.children.add(newTest)
       })
     })
-    parentTest.children.replace(updatedTestCases)
+    this.condenseTestItems(parentTest)
+  }
+
+  /**
+   * Condense test items by removing unnecessary nesting.
+   * All children below the parentTest containing only 1 child will be recursively condensed.
+   * Applies only until the type of the parentTest is different from the type of the child.
+   * @param parentTest Test below which to condense test items.
+   */
+  private condenseTestItems(parentTest: vscode.TestItem) {
+    // Advance through any single-child test items of the same type.
+    const getNextItem = (currentItem: vscode.TestItem): vscode.TestItem => {
+      let shouldContinue = true
+      while (currentItem.children.size === 1 && shouldContinue) {
+        // TestItemCollection supports only forEach iteration.
+        currentItem.children.forEach(childItem => {
+          if (
+            this.store.testCaseMetadata.get(currentItem)?.type !==
+            this.store.testCaseMetadata.get(childItem)?.type
+          ) {
+            shouldContinue = false
+            return
+          }
+          currentItem = childItem
+        })
+      }
+      return currentItem
+    }
+
+    // Recursively filter the current item and its children, and update their label relative to the parent.
+    const condense = (item: vscode.TestItem): vscode.TestItem => {
+      let currentParent = getNextItem(item)
+
+      currentParent.children.forEach(child => {
+        const filteredChild = condense(child)
+        this.store.testCaseMetadata
+          .get(filteredChild)
+          ?.setDisplayName(this.store.testCaseMetadata.get(currentParent))
+        if (filteredChild !== child) {
+          currentParent.children.delete(child.id)
+          currentParent.children.add(filteredChild)
+        }
+      })
+      return currentParent
+    }
+    return condense(parentTest)
   }
 }
 

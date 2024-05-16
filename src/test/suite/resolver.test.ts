@@ -3,6 +3,7 @@ import * as assert from 'assert'
 import {Test} from '@nestjs/testing'
 import {beforeEach, afterEach} from 'mocha'
 import * as sinon from 'sinon'
+import * as path from 'path'
 
 import {BazelBSPBuildClient} from '../../test-explorer/client'
 import {TestCaseStore} from '../../test-explorer/store'
@@ -99,6 +100,7 @@ suite('Test Resolver', () => {
           tags: [],
           languageIds: ['java'],
           dependencies: [],
+          baseDirectory: '/repo/root/base/directory/a',
         },
         {
           displayName: 'bar',
@@ -107,6 +109,7 @@ suite('Test Resolver', () => {
           tags: [],
           languageIds: ['python'],
           dependencies: [],
+          baseDirectory: '/repo/root/base/directory/b',
         },
         {
           displayName: 'abc',
@@ -115,6 +118,7 @@ suite('Test Resolver', () => {
           tags: [],
           languageIds: ['java'],
           dependencies: [],
+          baseDirectory: '/repo/root/base/directory/c',
         },
         {
           displayName: 'def',
@@ -123,6 +127,7 @@ suite('Test Resolver', () => {
           tags: [],
           languageIds: ['java'],
           dependencies: [],
+          baseDirectory: '/repo/root/base/directory/d',
         },
         {
           displayName: 'ghi',
@@ -143,9 +148,43 @@ suite('Test Resolver', () => {
           {
             target: target.id,
             sources: [
-              {uri: 'a', kind: bsp.SourceItemKind.File, generated: false},
-              {uri: 'b', kind: bsp.SourceItemKind.File, generated: false},
-              {uri: 'c', kind: bsp.SourceItemKind.File, generated: false},
+              {
+                uri: path.join(target.baseDirectory ?? '', 'MyFile1.language'),
+                kind: bsp.SourceItemKind.File,
+                generated: false,
+              },
+              {
+                uri: path.join(target.baseDirectory ?? '', 'MyFile2.language'),
+                kind: bsp.SourceItemKind.File,
+                generated: false,
+              },
+              {
+                uri: path.join(
+                  target.baseDirectory ?? '',
+                  '/src/dir/1/',
+                  'MyFile4.language'
+                ),
+                kind: bsp.SourceItemKind.File,
+                generated: false,
+              },
+              {
+                uri: path.join(
+                  target.baseDirectory ?? '',
+                  '/src/dir/2/',
+                  'MyFile5.language'
+                ),
+                kind: bsp.SourceItemKind.File,
+                generated: false,
+              },
+              {
+                uri: path.join(
+                  target.baseDirectory ?? '',
+                  '/src/dir/2/',
+                  'MyFile6.language'
+                ),
+                kind: bsp.SourceItemKind.File,
+                generated: false,
+              },
             ],
           },
         ],
@@ -215,10 +254,35 @@ suite('Test Resolver', () => {
       assert.ok(testCaseStore.testController.resolveHandler)
 
       await testCaseStore.testController.resolveHandler(root)
-      assert.equal(root.children.size, 3)
-      root.children.forEach(child => {
-        assert.ok(testCaseStore.testCaseMetadata.get(child))
-      })
+
+      // Validate items below the root
+      assert.equal(root.children.size, 2)
+      validateIDValues(
+        ['e', '{targetdir}:/repo/root/base/directory'],
+        root.children
+      )
+
+      // Validate directory nesting
+      const targetDirTestItem = root.children.get(
+        '{targetdir}:/repo/root/base/directory'
+      )
+      assert.ok(targetDirTestItem)
+      assert.equal(targetDirTestItem.children.size, 2)
+      validateIDValues(
+        [
+          '{targetdir}:/repo/root/base/directory/a',
+          '{targetdir}:/repo/root/base/directory/d',
+        ],
+        targetDirTestItem.children
+      )
+
+      // Validate targets placed under directories
+      const sampleTarget = targetDirTestItem.children
+        .get('{targetdir}:/repo/root/base/directory/d')
+        ?.children.get('d')
+      assert.ok(sampleTarget)
+      assert.ok(sampleTarget.canResolveChildren)
+      assert.equal(sampleTarget.children.size, 0)
 
       // Proper filtering based on target capabilities.
       const shouldBeExcluded = sampleBuildTargetsResult.targets.filter(
@@ -228,7 +292,13 @@ suite('Test Resolver', () => {
       )
 
       for (const excluded of shouldBeExcluded) {
-        assert.equal(root.children.get(excluded.id.uri), undefined)
+        const recursiveCheck = (item: vscode.TestItem) => {
+          item.children.forEach(child => {
+            recursiveCheck(child)
+            assert.equal(item.children.get(excluded.id.uri), undefined)
+          })
+        }
+        recursiveCheck(root)
       }
     })
 
@@ -278,6 +348,26 @@ suite('Test Resolver', () => {
       targetTestItem.children.forEach(child => {
         assert.ok(testCaseStore.testCaseMetadata.get(child))
       })
+
+      const sampleSrcDir1 = targetTestItem.children
+        .get('{sourcedir}:a:/repo/root/base/directory/a/src/dir')
+        ?.children.get('{sourcedir}:a:/repo/root/base/directory/a/src/dir/1')
+      assert.ok(sampleSrcDir1)
+      assert.equal(sampleSrcDir1.children.size, 1)
+      validateIDValues(
+        ['/repo/root/base/directory/a/src/dir/1/MyFile4.language'],
+        sampleSrcDir1?.children
+      )
+
+      const sampleSrcDir2 = targetTestItem.children
+        .get('{sourcedir}:a:/repo/root/base/directory/a/src/dir')
+        ?.children.get('{sourcedir}:a:/repo/root/base/directory/a/src/dir/2')
+      assert.ok(sampleSrcDir2)
+      assert.equal(sampleSrcDir2.children.size, 2)
+      validateIDValues(
+        ['/repo/root/base/directory/a/src/dir/2/MyFile5.language'],
+        sampleSrcDir2.children
+      )
     })
 
     test('refresh success', async () => {
@@ -298,7 +388,7 @@ suite('Test Resolver', () => {
       const tokenSource = new vscode.CancellationTokenSource()
       assert.ok(testCaseStore.testController.refreshHandler)
       await testCaseStore.testController.refreshHandler(tokenSource.token)
-      assert.equal(root.children.size, 3)
+      assert.equal(root.children.size, 2)
       root.children.forEach(child => {
         assert.ok(testCaseStore.testCaseMetadata.get(child))
       })
@@ -328,3 +418,14 @@ suite('Test Resolver', () => {
     })
   })
 })
+
+function validateIDValues(
+  expectedIDValues: string[],
+  testItems: vscode.TestItemCollection
+) {
+  const idValues = new Set(expectedIDValues)
+  testItems.forEach(child => {
+    idValues.delete(child.id)
+  })
+  assert.equal(idValues.size, 0)
+}
