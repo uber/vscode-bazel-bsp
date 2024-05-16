@@ -3,6 +3,8 @@ import * as assert from 'assert'
 import sinon from 'sinon'
 import {
   BuildTargetTestCaseInfo,
+  SourceDirTestCaseInfo,
+  TargetDirTestCaseInfo,
   TestCaseInfo,
   TestItemType,
 } from '../../test-info/test-info'
@@ -35,46 +37,46 @@ suite('TestInfo', () => {
   })
 
   suite('Test Run Params', () => {
-    test('params for Bazel target', async () => {
-      const testCases = [
-        {
-          profile: vscode.TestRunProfileKind.Run,
-          expectedResult: {
-            arguments: [],
-            environmentVariables: {},
-            originId: 'sample',
-            targets: [
-              {
-                uri: '//sample/target:test',
-              },
-            ],
-            workingDirectory: '',
-            dataKind: TestParamsDataKind.BazelTest,
-            data: {
-              coverage: false,
+    const testCases = [
+      {
+        profile: vscode.TestRunProfileKind.Run,
+        expectedResult: {
+          arguments: [],
+          environmentVariables: {},
+          originId: 'sample',
+          targets: [
+            {
+              uri: '//sample/target:test',
             },
+          ],
+          workingDirectory: '',
+          dataKind: TestParamsDataKind.BazelTest,
+          data: {
+            coverage: false,
           },
         },
-        {
-          profile: vscode.TestRunProfileKind.Coverage,
-          expectedResult: {
-            arguments: [],
-            environmentVariables: {},
-            originId: 'sample',
-            targets: [
-              {
-                uri: '//sample/target:test',
-              },
-            ],
-            workingDirectory: '',
-            dataKind: TestParamsDataKind.BazelTest,
-            data: {
-              coverage: true,
+      },
+      {
+        profile: vscode.TestRunProfileKind.Coverage,
+        expectedResult: {
+          arguments: [],
+          environmentVariables: {},
+          originId: 'sample',
+          targets: [
+            {
+              uri: '//sample/target:test',
             },
+          ],
+          workingDirectory: '',
+          dataKind: TestParamsDataKind.BazelTest,
+          data: {
+            coverage: true,
           },
         },
-      ]
+      },
+    ]
 
+    test('build target', async () => {
       const testItem = testController.createTestItem('sample', 'sample')
       const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
       for (const testCase of testCases) {
@@ -86,14 +88,101 @@ suite('TestInfo', () => {
       }
     })
 
-    test('params for non Bazel target', async () => {
+    test('source directory', async () => {
       const testItem = testController.createTestItem('sample', 'sample')
-      const testInfo = new TestCaseInfo(testItem, undefined, TestItemType.Root)
+      const testInfo = new SourceDirTestCaseInfo(
+        testItem,
+        sampleTarget,
+        '/sample/dir'
+      )
+      for (const testCase of testCases) {
+        const currentRun = sandbox.createStubInstance(TestRunTracker)
+        sandbox.stub(currentRun, 'originName').get(() => 'sample')
+        currentRun.getRunProfileKind.returns(testCase.profile)
+        const result = testInfo.prepareTestRunParams(currentRun)
+        assert.deepStrictEqual(result, testCase.expectedResult)
+      }
+    })
+
+    test('root', async () => {
+      const testItem = testController.createTestItem('sample', 'sample')
+      let testInfo = new TestCaseInfo(testItem, undefined, TestItemType.Root)
 
       const currentRun = sandbox.createStubInstance(TestRunTracker)
       sandbox.stub(currentRun, 'originName').get(() => 'sample')
       const result = testInfo.prepareTestRunParams(currentRun)
       assert.equal(result, undefined)
+    })
+
+    test('target directory', async () => {
+      const testItem = testController.createTestItem('sample', 'sample')
+      const testInfo = new TargetDirTestCaseInfo(testItem, '/sample/dir')
+      const currentRun = sandbox.createStubInstance(TestRunTracker)
+      sandbox.stub(currentRun, 'originName').get(() => 'sample')
+      const result = testInfo.prepareTestRunParams(currentRun)
+      assert.equal(result, undefined)
+    })
+  })
+
+  suite('Set display name', () => {
+    test('source directory, compare to different item type', async () => {
+      const testItem = testController.createTestItem('sample', 'sample')
+      const testInfo = new SourceDirTestCaseInfo(
+        testItem,
+        sampleTarget,
+        '/sample/dir'
+      )
+      const relativeToItem = new BuildTargetTestCaseInfo(
+        testController.createTestItem('sample', 'sample'),
+        sampleTarget
+      )
+      testInfo.setDisplayName(relativeToItem)
+      assert.equal(testItem.label, '/sample/dir')
+    })
+
+    test('source directory, compare to same item type', async () => {
+      const testItem = testController.createTestItem('sample', 'sample')
+      const testInfo = new SourceDirTestCaseInfo(
+        testItem,
+        sampleTarget,
+        '/sample/dir'
+      )
+      const relativeToItem = new SourceDirTestCaseInfo(
+        testController.createTestItem('sample', 'sample'),
+        sampleTarget,
+        '/sample'
+      )
+      testInfo.setDisplayName(relativeToItem)
+      assert.equal(testItem.label, 'dir')
+    })
+
+    test('target directory, compare to different item type', async () => {
+      const testItem = testController.createTestItem('sample', 'sample')
+      const testInfo = new TargetDirTestCaseInfo(testItem, '/sample/dir')
+      const relativeToItem = new BuildTargetTestCaseInfo(
+        testController.createTestItem('sample', 'sample'),
+        sampleTarget
+      )
+      testInfo.setDisplayName(relativeToItem)
+      assert.equal(testItem.label, '/sample/dir')
+    })
+
+    test('target directory, compare to same item type', async () => {
+      const testItem = testController.createTestItem('sample', 'sample')
+      const testInfo = new TargetDirTestCaseInfo(testItem, '/sample/dir')
+      const relativeToItem = new TargetDirTestCaseInfo(
+        testController.createTestItem('sample', 'sample'),
+        '/sample'
+      )
+      testInfo.setDisplayName(relativeToItem)
+      assert.equal(testItem.label, 'dir')
+    })
+
+    test('build target', async () => {
+      const testItem = testController.createTestItem('sample', 'sample')
+      const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
+      testInfo.setDisplayName()
+      assert.equal(testItem.label, 'test')
     })
   })
 
