@@ -11,9 +11,11 @@ import {
   SourceFileTestCaseInfo,
   TargetDirTestCaseInfo,
   TestCaseInfo,
+  TestItemTestCaseInfo,
   TestItemType,
 } from './test-info'
 import {BuildTarget, SourceItem} from '../bsp/bsp'
+import {DocumentTestItem} from '../language-tools/manager'
 
 /**
  * Class which includes various methods to create test items.
@@ -150,6 +152,32 @@ export class TestItemFactory {
       rootTestItem: currentItem,
       baseTestItem: baseItem,
     }
+  }
+
+  /**
+   * Create a new item representing an individual test case within a source file.
+   * @param details DocumentTestItem containing test case details to create the item.
+   * @param target Target with which this test item should be associated.
+   * @returns New TestItem with corresponding metadata representing an individual test case.
+   */
+  createTestCaseTestItem(
+    details: DocumentTestItem,
+    target: BuildTarget
+  ): TestItem {
+    const id = `{testcase}:${target.id.uri}:${details.uri.path}${
+      details.parent ? `:${details.parent.name}` : ''
+    }:${details.name}`
+    const newTest = this.store.testController.createTestItem(
+      id,
+      details.name,
+      details.uri
+    )
+    newTest.range = details.range
+    this.store.testCaseMetadata.set(
+      newTest,
+      new TestItemTestCaseInfo(newTest, target, details)
+    )
+    return newTest
   }
 
   /**

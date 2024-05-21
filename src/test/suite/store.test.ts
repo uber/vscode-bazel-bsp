@@ -16,6 +16,7 @@ import {RunTrackerFactory} from '../../test-runner/run-factory'
 import {ConnectionDetailsParser} from '../../server/connection-details'
 import {TestItemFactory} from '../../test-info/test-item-factory'
 import {CoverageTracker} from '../../coverage-utils/coverage-tracker'
+import {LanguageToolManager} from '../../language-tools/manager'
 
 suite('Test Controller', () => {
   let ctx: vscode.ExtensionContext
@@ -36,6 +37,7 @@ suite('Test Controller', () => {
         ConnectionDetailsParser,
         TestItemFactory,
         CoverageTracker,
+        LanguageToolManager,
       ],
     }).compile()
     moduleRef.init()

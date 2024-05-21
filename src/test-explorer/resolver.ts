@@ -11,6 +11,7 @@ import {TestCaseInfo, TestItemType} from '../test-info/test-info'
 import {getExtensionSetting, SettingName} from '../utils/settings'
 import {Utils} from '../utils/utils'
 import {TestItemFactory} from '../test-info/test-item-factory'
+import {DocumentTestItem, LanguageToolManager} from '../language-tools/manager'
 
 @Injectable()
 export class TestResolver implements OnModuleInit, vscode.Disposable {
@@ -19,6 +20,8 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
   @Inject(BazelBSPBuildClient) private readonly buildClient: BazelBSPBuildClient
   @Inject(BuildServerManager) private readonly buildServer: BuildServerManager
   @Inject(TestItemFactory) private readonly testItemFactory: TestItemFactory
+  @Inject(LanguageToolManager)
+  private readonly languageToolManager: LanguageToolManager
 
   onModuleInit() {
     this.ctx.subscriptions.push(this)
@@ -75,6 +78,8 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
           case TestItemType.BazelTarget:
             await this.resolveSourceFiles(parentTest, combinedToken)
             break
+          case TestItemType.SourceFile:
+            await this.resolveDocumentTestCases(parentTest, combinedToken)
         }
       }
     )
@@ -209,6 +214,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
 
     const directories = new Map<string, vscode.TestItem>()
     parentTest.children.replace([])
+    const allDocumentTestItems: vscode.TestItem[] = []
     result.items.forEach(target => {
       target.sources.forEach(source => {
         // Parent to which the source file's test item will be added.
@@ -234,10 +240,58 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
           parentTarget,
           source
         )
+
         relevantParent.children.add(newTest)
+        allDocumentTestItems.push(newTest)
       })
     })
     this.condenseTestItems(parentTest)
+
+    // Kick off test case resolution within each of the target's documents.
+    for (const doc of allDocumentTestItems) {
+      await this.resolveDocumentTestCases(doc, cancellationToken)
+    }
+  }
+
+  private async resolveDocumentTestCases(
+    parentTest: vscode.TestItem,
+    cancellationToken?: vscode.CancellationToken
+  ) {
+    const parentTestInfo = this.store.testCaseMetadata.get(parentTest)
+    if (!parentTestInfo?.target || parentTest.uri === undefined) return
+
+    // Convert document contents into generic DocumentTestItem data.
+    const testFileContents = await this.languageToolManager
+      .getLanguageTools(parentTestInfo.target)
+      .getDocumentTestCases(parentTest.uri)
+
+    // If document analysis has determined that it is not to be considered a test file, hide it.
+    if (!testFileContents.isTestFile) {
+      // If removing this test item leaves the parent empty, clear the parent as well.
+      const cleanupEmptyParent = (testItem?: vscode.TestItem) => {
+        if (testItem?.children.size === 0) {
+          testItem.parent?.children.delete(testItem.id)
+          cleanupEmptyParent(testItem.parent)
+        }
+      }
+
+      parentTest.parent?.children.delete(parentTest.id)
+      cleanupEmptyParent(parentTest.parent)
+    }
+
+    // Convert the returned test cases into TestItems and add to the tree.
+    const newItems = new Map<DocumentTestItem, vscode.TestItem>()
+    for (const testCase of testFileContents.testCases ?? []) {
+      const newTest = this.testItemFactory.createTestCaseTestItem(
+        testCase,
+        parentTestInfo.target
+      )
+      newItems.set(testCase, newTest)
+
+      // Maintain the same parent-child relationship as the returned test case data.
+      if (testCase.parent) newItems.get(testCase.parent)?.children.add(newTest)
+      else parentTest.children.add(newTest)
+    }
   }
 
   /**
