@@ -22,11 +22,18 @@ import {Utils} from '../../utils/utils'
 import * as bsp from '../../bsp/bsp'
 import {
   BuildTargetTestCaseInfo,
+  SourceFileTestCaseInfo,
   TestCaseInfo,
   TestItemType,
 } from '../../test-info/test-info'
 import * as settings from '../../utils/settings'
 import {TestItemFactory} from '../../test-info/test-item-factory'
+import {
+  DocumentTestItem,
+  LanguageToolManager,
+  LanguageTools,
+} from '../../language-tools/manager'
+import {BaseLanguageTools} from '../../language-tools/base'
 
 suite('Test Resolver', () => {
   let ctx: vscode.ExtensionContext
@@ -34,6 +41,7 @@ suite('Test Resolver', () => {
   let testResolver: TestResolver
   let buildServerStub: sinon.SinonStubbedInstance<BuildServerManager>
   let buildClientStub: sinon.SinonStubbedInstance<BazelBSPBuildClient>
+  let languageToolsStub: sinon.SinonStubbedInstance<LanguageTools>
   let sampleConn: MessageConnection
 
   const sandbox = sinon.createSandbox()
@@ -46,6 +54,7 @@ suite('Test Resolver', () => {
     buildServerStub.getConnection.returns(Promise.resolve(sampleConn))
 
     buildClientStub = sandbox.createStubInstance(BazelBSPBuildClient)
+    languageToolsStub = sandbox.createStubInstance(BaseLanguageTools)
 
     // Return a fixed workspace root to avoid impact of local environment.
     sandbox
@@ -67,6 +76,12 @@ suite('Test Resolver', () => {
           return buildServerStub
         } else if (token === BazelBSPBuildClient) {
           return buildClientStub
+        } else if (token === LanguageToolManager) {
+          return {
+            getLanguageTools: target => {
+              return languageToolsStub
+            },
+          }
         }
         throw new Error('No mock available for token.')
       })
@@ -332,6 +347,11 @@ suite('Test Resolver', () => {
         .stub(sampleConn, 'sendRequest')
         .returns(Promise.resolve(sampleSourceItemsResult(buildTarget)))
 
+      languageToolsStub.getDocumentTestCases.resolves({
+        isTestFile: true,
+        testCases: [],
+      })
+
       const targetTestItem = testCaseStore.testController.createTestItem(
         'sample',
         'Sample target test item'
@@ -368,6 +388,76 @@ suite('Test Resolver', () => {
         ['/repo/root/base/directory/a/src/dir/2/MyFile5.language'],
         sampleSrcDir2.children
       )
+    })
+
+    test('test items within a source file', async () => {
+      const buildTarget = sampleBuildTargetsResult.targets[0]
+      const sourceFileTestItem = testCaseStore.testController.createTestItem(
+        'sample',
+        'Sample target test item',
+        vscode.Uri.parse('file:///sample/path/test_file.py')
+      )
+
+      // Two test items with 1 child each.
+      const testCases: DocumentTestItem[] = [
+        {
+          name: 'test_case_1',
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+          ),
+          uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
+          testFilter: 'test_case_1',
+        },
+        {
+          name: 'test_case_2',
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+          ),
+          uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
+          testFilter: 'test_case_2',
+        },
+        {
+          name: 'sub_test_case_1',
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+          ),
+          uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
+          testFilter: 'sub_test_case_2',
+        },
+        {
+          name: 'sub_test_case_2',
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+          ),
+          uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
+          testFilter: 'sub_test_case_2',
+        },
+      ]
+      testCases[2].parent = testCases[0]
+      testCases[3].parent = testCases[1]
+
+      languageToolsStub.getDocumentTestCases.resolves({
+        isTestFile: true,
+        testCases: testCases,
+      })
+
+      testCaseStore.testController.items.add(sourceFileTestItem)
+      testCaseStore.testCaseMetadata.set(
+        sourceFileTestItem,
+        new SourceFileTestCaseInfo(sourceFileTestItem, buildTarget)
+      )
+      assert.ok(testCaseStore.testController.resolveHandler)
+
+      await testCaseStore.testController.resolveHandler(sourceFileTestItem)
+      assert.equal(sourceFileTestItem.children.size, 2)
+      sourceFileTestItem.children.forEach(child => {
+        assert.ok(testCaseStore.testCaseMetadata.get(child))
+        assert.equal(child.children.size, 1)
+      })
     })
 
     test('refresh success', async () => {

@@ -12,6 +12,7 @@ import {TestItemFactory} from '../../test-info/test-item-factory'
 import * as assert from 'assert'
 import {BuildTarget, SourceItem, SourceItemKind} from '../../bsp/bsp'
 import {TestItemType} from '../../test-info/test-info'
+import {DocumentTestItem} from '../../language-tools/manager'
 
 suite('Test Item Factory', () => {
   let ctx: vscode.ExtensionContext
@@ -85,6 +86,36 @@ suite('Test Item Factory', () => {
       item.uri?.fsPath,
       vscode.Uri.parse(sourceItem.uri).fsPath
     )
+  })
+
+  test('create test case items', async () => {
+    const items: DocumentTestItem[] = [
+      {
+        name: 'sample1',
+        uri: vscode.Uri.parse('file:///workspace/test/file.go'),
+        range: new vscode.Range(0, 0, 0, 0),
+        testFilter: 'sample1',
+      },
+      {
+        name: 'sample2',
+        uri: vscode.Uri.parse('file:///workspace/test/file.go'),
+        range: new vscode.Range(0, 0, 0, 0),
+        testFilter: 'sample2',
+      },
+      {
+        name: 'sample3',
+        uri: vscode.Uri.parse('file:///workspace/test/file.go'),
+        range: new vscode.Range(0, 0, 0, 0),
+        testFilter: 'sample3',
+      },
+    ]
+
+    for (const item of items) {
+      const result = testItemFactory.createTestCaseTestItem(item, sampleTarget)
+      assert.equal(result.id, `{testcase}:test:${item.uri.path}:${item.name}`)
+      assert.deepStrictEqual(result.range, item.range)
+      assert.equal(result.uri?.fsPath, item.uri.fsPath)
+    }
   })
 
   test('create target directory items', async () => {

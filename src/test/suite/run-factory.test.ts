@@ -19,6 +19,7 @@ import sinon from 'sinon'
 import {ConnectionDetailsParser} from '../../server/connection-details'
 import {TestItemFactory} from '../../test-info/test-item-factory'
 import {CoverageTracker} from '../../coverage-utils/coverage-tracker'
+import {LanguageToolManager} from '../../language-tools/manager'
 
 suite('Test Runner Factory', () => {
   let ctx: vscode.ExtensionContext
@@ -43,6 +44,7 @@ suite('Test Runner Factory', () => {
         ConnectionDetailsParser,
         TestItemFactory,
         CoverageTracker,
+        LanguageToolManager,
       ],
     }).compile()
     moduleRef.init()

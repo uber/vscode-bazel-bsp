@@ -3,6 +3,7 @@ import * as path from 'path'
 import {BuildTarget, TestParams, TestResult, StatusCode} from '../bsp/bsp'
 import {TestParamsDataKind, BazelTestParamsData} from '../bsp/bsp-ext'
 import {TestCaseStatus, TestRunTracker} from '../test-runner/run-tracker'
+import {DocumentTestItem} from '../language-tools/manager'
 
 export enum TestItemType {
   Root,
@@ -212,5 +213,32 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
    */
   setDisplayName(relativeToItem?: TestCaseInfo | undefined) {
     this.testItem.label = path.basename(this.testItem.uri?.path ?? '')
+  }
+}
+
+/**
+ * Test case information for a single test case within a file.
+ * Current behavior is identical to BuildTargetTestCaseInfo, but in the future this can add filtering by file.
+ */
+export class TestItemTestCaseInfo extends BuildTargetTestCaseInfo {
+  public readonly type: TestItemType
+  private readonly details: DocumentTestItem
+
+  constructor(
+    test: vscode.TestItem,
+    target: BuildTarget,
+    details: DocumentTestItem
+  ) {
+    super(test, target)
+    this.type = TestItemType.TestCase
+    this.details = details
+  }
+
+  /**
+   * Sets a test case's label to its name.
+   * @param relativeToItem will be ignored in this implementation
+   */
+  setDisplayName(relativeToItem?: TestCaseInfo | undefined) {
+    this.testItem.label = this.details.name
   }
 }

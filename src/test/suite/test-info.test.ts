@@ -6,12 +6,14 @@ import {
   SourceDirTestCaseInfo,
   TargetDirTestCaseInfo,
   TestCaseInfo,
+  TestItemTestCaseInfo,
   TestItemType,
 } from '../../test-info/test-info'
 import {BuildTarget, StatusCode, TestResult} from '../../bsp/bsp'
 import {TestCaseStatus, TestRunTracker} from '../../test-runner/run-tracker'
 import {beforeEach, afterEach} from 'mocha'
 import {TestParamsDataKind} from '../../bsp/bsp-ext'
+import {DocumentTestItem} from '../../language-tools/manager'
 
 suite('TestInfo', () => {
   const sampleTarget: BuildTarget = {
@@ -181,6 +183,24 @@ suite('TestInfo', () => {
     test('build target', async () => {
       const testItem = testController.createTestItem('sample', 'sample')
       const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
+      testInfo.setDisplayName()
+      assert.equal(testItem.label, 'test')
+    })
+
+    test('test case', async () => {
+      const testItem = testController.createTestItem('sample', 'sample')
+      const sampleDetails: DocumentTestItem = {
+        uri: vscode.Uri.parse('file:///sample/file'),
+        name: 'test',
+        parent: undefined,
+        range: new vscode.Range(0, 0, 0, 0),
+        testFilter: 'test',
+      }
+      const testInfo = new TestItemTestCaseInfo(
+        testItem,
+        sampleTarget,
+        sampleDetails
+      )
       testInfo.setDisplayName()
       assert.equal(testItem.label, 'test')
     })
