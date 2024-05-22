@@ -75,11 +75,12 @@ export class TestItemFactory {
     target: BuildTarget,
     sourceItem: SourceItem
   ): TestItem {
+    const id = `{sourcefile}:${target.id.uri}:${sourceItem.uri}`
     const label = target?.baseDirectory
       ? path.relative(target.baseDirectory, sourceItem.uri)
       : sourceItem.uri
     const newTest = this.store.testController.createTestItem(
-      sourceItem.uri,
+      id,
       label,
       vscode.Uri.parse(sourceItem.uri)
     )

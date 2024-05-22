@@ -86,6 +86,10 @@ suite('Test Item Factory', () => {
       item.uri?.fsPath,
       vscode.Uri.parse(sourceItem.uri).fsPath
     )
+    assert.equal(
+      item.id,
+      `{sourcefile}:${sampleTarget.id.uri}:${sourceItem.uri}`
+    )
   })
 
   test('create test case items', async () => {

@@ -68,6 +68,8 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
           'Loading: waiting for build server initialization'
         )
         await this.buildClient.getInitializeResult()
+        this.store.clearTestItemWatchers(parentTest)
+
         updateDescription(parentTest)
         const parentMetadata = this.store.testCaseMetadata.get(parentTest)
 
@@ -250,6 +252,15 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     // Kick off test case resolution within each of the target's documents.
     for (const doc of allDocumentTestItems) {
       await this.resolveDocumentTestCases(doc, cancellationToken)
+
+      if (doc.uri) {
+        // Assign a watcher to each source file's test item, to handle test case changes in the file.
+        const watcher = vscode.workspace.createFileSystemWatcher(doc.uri.fsPath)
+        watcher.onDidChange(e => {
+          this.resolveHandler(doc)
+        })
+        this.store.updateTestItemWatcher(doc.id, watcher)
+      }
     }
   }
 
@@ -258,7 +269,13 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     cancellationToken?: vscode.CancellationToken
   ) {
     const parentTestInfo = this.store.testCaseMetadata.get(parentTest)
-    if (!parentTestInfo?.target || parentTest.uri === undefined) return
+    if (
+      !parentTestInfo?.target ||
+      parentTest.uri === undefined ||
+      parentTestInfo.type !== TestItemType.SourceFile
+    )
+      return
+    parentTest.children.replace([])
 
     // Convert document contents into generic DocumentTestItem data.
     const testFileContents = await this.languageToolManager

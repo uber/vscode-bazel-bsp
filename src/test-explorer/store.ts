@@ -10,12 +10,16 @@ export class TestCaseStore implements OnModuleInit, vscode.Disposable {
   testController: vscode.TestController
   testCaseMetadata: WeakMap<vscode.TestItem, TestCaseInfo>
 
+  // Watcher to update a test item's children.  Key corresponds to the test item ID.
+  testItemWatchers: Map<string, vscode.FileSystemWatcher>
+
   constructor() {
     this.testController = vscode.tests.createTestController(
       'bazelBSP',
       'Bazel BSP Tests'
     )
     this.testCaseMetadata = new WeakMap<vscode.TestItem, TestCaseInfo>()
+    this.testItemWatchers = new Map()
   }
 
   onModuleInit() {
@@ -24,5 +28,36 @@ export class TestCaseStore implements OnModuleInit, vscode.Disposable {
 
   dispose() {
     this.testController.dispose()
+    for (const watcher of this.testItemWatchers.values()) {
+      watcher.dispose()
+    }
+  }
+
+  /**
+   * Stores a single watcher for the given TestItem.id value, disposing of any existing watcher if present.
+   * @param id TestItem ID for which to store the watcher.
+   * @param watcher FileSystemWatcher which has already been created, or undefined to clear the watcher.
+   */
+  updateTestItemWatcher(id: string, watcher?: vscode.FileSystemWatcher) {
+    const oldWatcher = this.testItemWatchers.get(id)
+    if (oldWatcher) {
+      oldWatcher.dispose()
+    }
+    if (watcher) this.testItemWatchers.set(id, watcher)
+    else this.testItemWatchers.delete(id)
+  }
+
+  /**
+   * Clear all existing watchers for the given TestItem and its children.
+   * @param parentTest Parent test below which all watchers will be cleared, inclusive of the parent.
+   */
+  clearTestItemWatchers(parentTest: vscode.TestItem) {
+    const clear = (test: vscode.TestItem) => {
+      test.children.forEach(item => {
+        this.updateTestItemWatcher(item.id)
+        clear(item)
+      })
+    }
+    clear(parentTest)
   }
 }
