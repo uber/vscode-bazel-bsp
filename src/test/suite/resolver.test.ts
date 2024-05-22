@@ -375,7 +375,9 @@ suite('Test Resolver', () => {
       assert.ok(sampleSrcDir1)
       assert.equal(sampleSrcDir1.children.size, 1)
       validateIDValues(
-        ['/repo/root/base/directory/a/src/dir/1/MyFile4.language'],
+        [
+          '{sourcefile}:a:/repo/root/base/directory/a/src/dir/1/MyFile4.language',
+        ],
         sampleSrcDir1?.children
       )
 
@@ -385,7 +387,9 @@ suite('Test Resolver', () => {
       assert.ok(sampleSrcDir2)
       assert.equal(sampleSrcDir2.children.size, 2)
       validateIDValues(
-        ['/repo/root/base/directory/a/src/dir/2/MyFile5.language'],
+        [
+          '{sourcefile}:a:/repo/root/base/directory/a/src/dir/2/MyFile5.language',
+        ],
         sampleSrcDir2.children
       )
     })
