@@ -218,7 +218,7 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
 
 /**
  * Test case information for a single test case within a file.
- * Current behavior is identical to BuildTargetTestCaseInfo, but in the future this can add filtering by file.
+ * Includes the applicable test filter to run only this test case.
  */
 export class TestItemTestCaseInfo extends BuildTargetTestCaseInfo {
   public readonly type: TestItemType
@@ -232,6 +232,23 @@ export class TestItemTestCaseInfo extends BuildTargetTestCaseInfo {
     super(test, target)
     this.type = TestItemType.TestCase
     this.details = details
+  }
+
+  /**
+   * Add test filters to the parameters prepared for this test case.
+   * @param currentRun TestRunTracker for the current test run.
+   * @returns TestParams to use in the Bazel BSP request, or undefined if the test case is not independently runnable.
+   */
+  prepareTestRunParams(currentRun: TestRunTracker): TestParams | undefined {
+    if (this.target === undefined) return
+
+    const params = super.prepareTestRunParams(currentRun)
+    if (params?.dataKind === TestParamsDataKind.BazelTest) {
+      const bazelParams = params.data as BazelTestParamsData
+      bazelParams.testFilter = this.details.testFilter
+    }
+
+    return params
   }
 
   /**

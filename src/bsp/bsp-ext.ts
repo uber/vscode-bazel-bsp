@@ -8,6 +8,7 @@ export namespace TestParamsDataKind {
 
 export interface BazelTestParamsData {
   coverage?: boolean
+  testFilter?: string
 }
 
 export namespace TaskProgressDataKind {

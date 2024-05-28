@@ -106,6 +106,43 @@ suite('TestInfo', () => {
       }
     })
 
+    test('test case', async () => {
+      const testItem = testController.createTestItem('sample', 'sample')
+      const sampleDetails: DocumentTestItem = {
+        uri: vscode.Uri.parse('file:///sample/file'),
+        name: 'test',
+        parent: undefined,
+        range: new vscode.Range(0, 0, 0, 0),
+        testFilter: 'myTestFilter',
+      }
+
+      const testInfo = new TestItemTestCaseInfo(
+        testItem,
+        sampleTarget,
+        sampleDetails
+      )
+      for (const testCase of testCases) {
+        const currentRun = sandbox.createStubInstance(TestRunTracker)
+        sandbox.stub(currentRun, 'originName').get(() => 'sample')
+        currentRun.getRunProfileKind.returns(testCase.profile)
+        const result = testInfo.prepareTestRunParams(currentRun)
+        assert.ok(result)
+        for (const key in testCase.expectedResult) {
+          if (key !== 'data') {
+            assert.deepStrictEqual(
+              result[key],
+              testCase.expectedResult[key],
+              `Field ${key} does not match`
+            )
+          }
+        }
+        assert.deepStrictEqual(result.data, {
+          testFilter: sampleDetails.testFilter,
+          coverage: testCase.expectedResult.data.coverage,
+        })
+      }
+    })
+
     test('root', async () => {
       const testItem = testController.createTestItem('sample', 'sample')
       let testInfo = new TestCaseInfo(testItem, undefined, TestItemType.Root)
