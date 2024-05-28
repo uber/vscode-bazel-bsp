@@ -5,8 +5,12 @@ import {beforeEach, afterEach} from 'mocha'
 import * as sinon from 'sinon'
 import {MessageConnection} from 'vscode-jsonrpc'
 import * as bsp from '../../bsp/bsp'
+import * as bspExt from '../../bsp/bsp-ext'
 
-import {BazelBSPBuildClient} from '../../test-explorer/client'
+import {
+  BazelBSPBuildClient,
+  TaskOriginHandlers,
+} from '../../test-explorer/client'
 import {
   contextProviderFactory,
   outputChannelProvider,
@@ -346,5 +350,39 @@ suite('Build Client', () => {
     logParams.forEach(params => {
       logStub.calledWith(params.message)
     })
+  })
+
+  test('onBuildPublishOutput', async () => {
+    const sampleParams: bspExt.PublishOutputParams[] = [
+      {
+        originId: 'sample-origin',
+        taskId: {id: 'sample-task'},
+        buildTarget: {uri: 'sample-target'},
+        dataKind: 'sample-kind',
+        data: {sample: 'data'},
+      },
+      {
+        originId: 'sample-origin',
+        taskId: {id: 'sample-task'},
+        buildTarget: {uri: 'sample-target'},
+        dataKind: 'sample-kind',
+        data: {sample: 'data'},
+      },
+    ]
+
+    const calls: bspExt.PublishOutputParams[] = []
+    const handlers: TaskOriginHandlers = {
+      onBuildPublishOutput: (params: bspExt.PublishOutputParams) => {
+        calls.push(params)
+      },
+    }
+
+    buildClient.registerOriginHandlers('sample-origin', handlers)
+    for (const params of sampleParams) {
+      buildClient.onBuildPublishOutput(params)
+    }
+
+    assert.equal(calls.length, sampleParams.length)
+    assert.deepEqual(calls, sampleParams)
   })
 })
