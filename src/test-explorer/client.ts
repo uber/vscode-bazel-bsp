@@ -2,6 +2,7 @@ import * as vscode from 'vscode'
 import {Inject, Injectable, OnModuleInit} from '@nestjs/common'
 
 import * as bsp from '../bsp/bsp'
+import * as bspExt from '../bsp/bsp-ext'
 import {BuildServerManager} from '../server/server-manager'
 import {EXTENSION_CONTEXT_TOKEN} from '../custom-providers'
 import {Deferred, Utils} from '../utils/utils'
@@ -18,11 +19,16 @@ export type TaskOriginHandlers = {
   onBuildTaskStart?: (params: bsp.TaskStartParams) => void
   onBuildTaskProgress?: (params: bsp.TaskProgressParams) => void
   onBuildTaskFinish?: (params: bsp.TaskFinishParams) => void
+  onBuildPublishOutput?: (params: bspExt.PublishOutputParams) => void
 }
 
 @Injectable()
 export class BazelBSPBuildClient
-  implements bsp.BuildClient, OnModuleInit, vscode.Disposable
+  implements
+    bsp.BuildClient,
+    bspExt.ExtendedBuildClient,
+    OnModuleInit,
+    vscode.Disposable
 {
   @Inject(EXTENSION_CONTEXT_TOKEN) private readonly ctx: vscode.ExtensionContext
   @Inject(BuildServerManager) private readonly buildServer: BuildServerManager
@@ -44,6 +50,7 @@ export class BazelBSPBuildClient
 
     const conn = await this.buildServer.getConnection()
     bsp.registerBuildClientHandlers(conn, this)
+    bspExt.registerExtendedBuildClientHandlers(conn, this)
     this.initializationRequest()
   }
 
@@ -156,6 +163,19 @@ export class BazelBSPBuildClient
       const handler = this.originHandlers.get(params.originId)
       if (handler && handler.onBuildTaskFinish) {
         handler.onBuildTaskFinish(params)
+        return
+      }
+    }
+
+    this.clientOutputChannel.trace(JSON.stringify(params))
+  }
+
+  onBuildPublishOutput(params: bspExt.PublishOutputParams): void {
+    if (params.originId) {
+      // Intercept if a custom handler is registered for this origidId and method.
+      const handler = this.originHandlers.get(params.originId)
+      if (handler && handler.onBuildPublishOutput) {
+        handler.onBuildPublishOutput(params)
         return
       }
     }

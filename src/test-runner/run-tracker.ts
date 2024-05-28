@@ -1,9 +1,13 @@
 import * as vscode from 'vscode'
 
 import {TestCaseInfo, TestItemType} from '../test-info/test-info'
-import {LogMessageParams, TaskProgressParams} from '../bsp/bsp'
+import {LogMessageParams} from '../bsp/bsp'
 import {TaskOriginHandlers} from '../test-explorer/client'
-import {TaskProgressDataKind, TestCoverageReport} from '../bsp/bsp-ext'
+import {
+  PublishOutputDataKind,
+  PublishOutputParams,
+  TestCoverageReport,
+} from '../bsp/bsp-ext'
 import {CoverageTracker} from '../coverage-utils/coverage-tracker'
 
 export enum TestCaseStatus {
@@ -149,8 +153,8 @@ export class TestRunTracker implements TaskOriginHandlers {
    * Collects selected info that may be reported via progress events.
    * @param params Progress event containing data to be collected.
    */
-  public onBuildTaskProgress(params: TaskProgressParams): void {
-    if (params.dataKind === TaskProgressDataKind.CoverageReport) {
+  public onBuildPublishOutput(params: PublishOutputParams): void {
+    if (params.dataKind === PublishOutputDataKind.CoverageReport) {
       const data = params.data as TestCoverageReport
       this.pending.push(
         this.coverageTracker.handleCoverageReport(this.run, data.lcovReportUri)
