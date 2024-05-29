@@ -4,6 +4,7 @@ import sinon from 'sinon'
 import {
   BuildTargetTestCaseInfo,
   SourceDirTestCaseInfo,
+  SourceFileTestCaseInfo,
   TargetDirTestCaseInfo,
   TestCaseInfo,
   TestItemTestCaseInfo,
@@ -103,6 +104,41 @@ suite('TestInfo', () => {
         currentRun.getRunProfileKind.returns(testCase.profile)
         const result = testInfo.prepareTestRunParams(currentRun)
         assert.deepStrictEqual(result, testCase.expectedResult)
+      }
+    })
+
+    test('source file', async () => {
+      const testItem = testController.createTestItem('sample', 'sample')
+      const sampleDetails: DocumentTestItem = {
+        uri: vscode.Uri.parse('file:///sample/file'),
+        name: 'test',
+        parent: undefined,
+        range: new vscode.Range(0, 0, 0, 0),
+        testFilter: 'myDocumentName.py',
+      }
+
+      const testInfo = new SourceFileTestCaseInfo(testItem, sampleTarget)
+      testInfo.setDocumentTestItem(sampleDetails)
+
+      for (const testCase of testCases) {
+        const currentRun = sandbox.createStubInstance(TestRunTracker)
+        sandbox.stub(currentRun, 'originName').get(() => 'sample')
+        currentRun.getRunProfileKind.returns(testCase.profile)
+        const result = testInfo.prepareTestRunParams(currentRun)
+        assert.ok(result)
+        for (const key in testCase.expectedResult) {
+          if (key !== 'data') {
+            assert.deepStrictEqual(
+              result[key],
+              testCase.expectedResult[key],
+              `Field ${key} does not match`
+            )
+          }
+        }
+        assert.deepStrictEqual(result.data, {
+          testFilter: sampleDetails.testFilter,
+          coverage: testCase.expectedResult.data.coverage,
+        })
       }
     })
 

@@ -39,6 +39,8 @@ suite('Python Language Tools', () => {
     for (const test of result.testCases) {
       assert.ok(expectedTests.includes(test.name))
     }
+    assert.equal(result.documentTest?.testFilter, 'my_test.py')
+    assert.equal(result.documentTest?.name, 'my_test.py')
   })
 
   test('non test file', async () => {

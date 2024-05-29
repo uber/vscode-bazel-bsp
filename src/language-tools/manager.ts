@@ -18,6 +18,7 @@ export interface LanguageTools {
 export type TestFileContents = {
   isTestFile: boolean
   testCases: DocumentTestItem[]
+  documentTest?: DocumentTestItem
 }
 
 // Test item parsed from the document, including a parent if applicable to determine tree shape.

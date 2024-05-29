@@ -201,10 +201,23 @@ export class SourceDirTestCaseInfo extends BuildTargetTestCaseInfo {
  */
 export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
   public readonly type: TestItemType
+  private details: DocumentTestItem
 
   constructor(test: vscode.TestItem, target: BuildTarget) {
     super(test, target)
     this.type = TestItemType.SourceFile
+  }
+
+  prepareTestRunParams(currentRun: TestRunTracker): TestParams | undefined {
+    if (this.target === undefined) return
+
+    const params = super.prepareTestRunParams(currentRun)
+    if (params?.dataKind === TestParamsDataKind.BazelTest) {
+      const bazelParams = params.data as BazelTestParamsData
+      bazelParams.testFilter = this.details.testFilter
+    }
+
+    return params
   }
 
   /**
@@ -212,7 +225,21 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
    * @param relativeToItem will be ignored in this implementation
    */
   setDisplayName(relativeToItem?: TestCaseInfo | undefined) {
-    this.testItem.label = path.basename(this.testItem.uri?.path ?? '')
+    if (this.details) {
+      this.testItem.label = this.details.name
+    } else {
+      this.testItem.label = path.basename(this.testItem.uri?.path ?? '')
+    }
+  }
+
+  /**
+   * Update the document's test item details.
+   * @param details DocumentTestItem representing a test item for the full document.
+   */
+  setDocumentTestItem(details: DocumentTestItem) {
+    this.details = details
+    this.testItem.range = details.range
+    this.setDisplayName()
   }
 }
 

@@ -7,7 +7,11 @@ import {BazelBSPBuildClient} from './client'
 import {EXTENSION_CONTEXT_TOKEN} from '../custom-providers'
 import {BuildServerManager, CANCEL_ERROR_CODE} from '../server/server-manager'
 import * as bsp from '../bsp/bsp'
-import {TestCaseInfo, TestItemType} from '../test-info/test-info'
+import {
+  SourceFileTestCaseInfo,
+  TestCaseInfo,
+  TestItemType,
+} from '../test-info/test-info'
 import {getExtensionSetting, SettingName} from '../utils/settings'
 import {Utils} from '../utils/utils'
 import {TestItemFactory} from '../test-info/test-item-factory'
@@ -268,14 +272,9 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     parentTest: vscode.TestItem,
     cancellationToken?: vscode.CancellationToken
   ) {
-    const parentTestInfo = this.store.testCaseMetadata.get(parentTest)
-    if (
-      !parentTestInfo?.target ||
-      parentTest.uri === undefined ||
-      parentTestInfo.type !== TestItemType.SourceFile
-    )
-      return
-    parentTest.children.replace([])
+    const parentTestInfo: SourceFileTestCaseInfo | undefined =
+      this.store.testCaseMetadata.get(parentTest) as SourceFileTestCaseInfo
+    if (!parentTestInfo?.target || parentTest.uri === undefined) return
 
     // Convert document contents into generic DocumentTestItem data.
     const testFileContents = await this.languageToolManager
@@ -309,6 +308,10 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       if (testCase.parent) newItems.get(testCase.parent)?.children.add(newTest)
       else parentTest.children.add(newTest)
     }
+
+    // Update the parent test with required information for full-file run.
+    if (testFileContents.documentTest)
+      parentTestInfo.setDocumentTestItem(testFileContents.documentTest)
   }
 
   /**

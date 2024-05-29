@@ -447,6 +447,15 @@ suite('Test Resolver', () => {
       languageToolsStub.getDocumentTestCases.resolves({
         isTestFile: true,
         testCases: testCases,
+        documentTest: {
+          name: 'My Document',
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+          ),
+          uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
+          testFilter: 'test_file.py',
+        },
       })
 
       testCaseStore.testController.items.add(sourceFileTestItem)
@@ -462,6 +471,7 @@ suite('Test Resolver', () => {
         assert.ok(testCaseStore.testCaseMetadata.get(child))
         assert.equal(child.children.size, 1)
       })
+      assert.equal(sourceFileTestItem.label, 'My Document')
     })
 
     test('refresh success', async () => {
