@@ -20,6 +20,16 @@ export class PythonLanguageTools implements LanguageTools {
       }
     }
 
+    const fullDocTestItem: DocumentTestItem = {
+      name: path.basename(document.fsPath),
+      range: new vscode.Range(
+        new vscode.Position(0, 0),
+        new vscode.Position(0, 0)
+      ),
+      uri: document,
+      testFilter: path.basename(document.fsPath),
+    }
+
     // Document symbols provided by Pylance.
     const symbols: vscode.DocumentSymbol[] =
       await vscode.commands.executeCommand(
@@ -78,6 +88,7 @@ export class PythonLanguageTools implements LanguageTools {
     return {
       isTestFile: true,
       testCases: result,
+      documentTest: fullDocTestItem,
     }
   }
 }
