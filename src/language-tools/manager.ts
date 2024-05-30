@@ -4,6 +4,7 @@ import {Injectable} from '@nestjs/common'
 import {BuildTarget} from '../bsp/bsp'
 import {PythonLanguageTools} from './python'
 import {BaseLanguageTools} from './base'
+import {JavaLanguageTools} from './java'
 
 /**
  * LanguageTools is used to define behavior that should differ based on language.
@@ -34,10 +35,13 @@ export type DocumentTestItem = {
 export class LanguageToolManager {
   private baseLanguageTools = new BaseLanguageTools()
   private pythonLanguageTools = new PythonLanguageTools()
+  private javaLanguageTools = new JavaLanguageTools()
 
   getLanguageTools(target: BuildTarget): LanguageTools {
     if (target.languageIds.find(val => val === 'python')) {
       return this.pythonLanguageTools
+    } else if (target.languageIds.find(val => val === 'java')) {
+      return this.javaLanguageTools
     }
     return this.baseLanguageTools
   }

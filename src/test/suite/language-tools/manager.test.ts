@@ -25,6 +25,20 @@ suite('Language Tools Manager', () => {
     assert.strictEqual(result.constructor.name, 'PythonLanguageTools')
   })
 
+  test('get tools, java', async () => {
+    const target: BuildTarget = {
+      id: {
+        uri: '@@//sample:target',
+      },
+      tags: [],
+      languageIds: ['java'],
+      dependencies: [],
+      capabilities: {},
+    }
+    const result = languageTools.getLanguageTools(target)
+    assert.strictEqual(result.constructor.name, 'JavaLanguageTools')
+  })
+
   test('get tools, other', async () => {
     const target: BuildTarget = {
       id: {
