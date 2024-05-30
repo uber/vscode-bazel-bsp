@@ -6,7 +6,11 @@ import {BuildServerManager} from './server/server-manager'
 import {BazelBSPBuildClient} from './test-explorer/client'
 import {TestCaseStore} from './test-explorer/store'
 import {TestRunner} from './test-runner/runner'
-import {contextProviderFactory, outputChannelProvider} from './custom-providers'
+import {
+  contextProviderFactory,
+  outputChannelProvider,
+  testControllerProvider,
+} from './custom-providers'
 import {TestResolver} from './test-explorer/resolver'
 import {RunTrackerFactory} from './test-runner/run-factory'
 import {ConnectionDetailsParser} from './server/connection-details'
@@ -34,6 +38,7 @@ export async function bootstrap(context: vscode.ExtensionContext) {
       TestItemFactory,
       CoverageTracker,
       LanguageToolManager,
+      testControllerProvider,
     ],
   })
   class AppModule {}

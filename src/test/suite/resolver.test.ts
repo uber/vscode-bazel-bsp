@@ -13,6 +13,7 @@ import {
   CANCEL_ERROR_CODE,
 } from '../../server/server-manager'
 import {
+  TEST_CONTROLLER_TOKEN,
   contextProviderFactory,
   outputChannelProvider,
 } from '../../custom-providers'
@@ -82,6 +83,8 @@ suite('Test Resolver', () => {
               return languageToolsStub
             },
           }
+        } else if (token === TEST_CONTROLLER_TOKEN) {
+          return vscode.tests.createTestController('resolverTestController', '')
         }
         throw new Error('No mock available for token.')
       })

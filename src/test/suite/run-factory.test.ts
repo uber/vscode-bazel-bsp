@@ -8,6 +8,7 @@ import {TestCaseStore} from '../../test-explorer/store'
 import {TestResolver} from '../../test-explorer/resolver'
 import {BuildServerManager} from '../../server/server-manager'
 import {
+  TEST_CONTROLLER_TOKEN,
   contextProviderFactory,
   outputChannelProvider,
 } from '../../custom-providers'
@@ -46,7 +47,17 @@ suite('Test Runner Factory', () => {
         CoverageTracker,
         LanguageToolManager,
       ],
-    }).compile()
+    })
+      .useMocker(token => {
+        if (token === TEST_CONTROLLER_TOKEN) {
+          return vscode.tests.createTestController(
+            'runFactoryTestController',
+            ''
+          )
+        }
+        throw new Error('No mock available for token.')
+      })
+      .compile()
     moduleRef.init()
     testCaseStore = moduleRef.get(TestCaseStore)
     buildClient = moduleRef.get(BazelBSPBuildClient)

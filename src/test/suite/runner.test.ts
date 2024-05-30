@@ -14,6 +14,7 @@ import {
   CANCEL_ERROR_CODE,
 } from '../../server/server-manager'
 import {
+  TEST_CONTROLLER_TOKEN,
   contextProviderFactory,
   outputChannelProvider,
 } from '../../custom-providers'
@@ -65,6 +66,11 @@ suite('Test Runner', () => {
           return buildServerStub
         } else if (token === BazelBSPBuildClient) {
           return buildClientStub
+        } else if (token === TEST_CONTROLLER_TOKEN) {
+          return vscode.tests.createTestController(
+            'testStoreTestController',
+            ''
+          )
         }
         throw new Error('No mock available for token.')
       })
