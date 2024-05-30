@@ -1,23 +1,22 @@
 import * as vscode from 'vscode'
 import {Inject, OnModuleInit} from '@nestjs/common'
 
-import {EXTENSION_CONTEXT_TOKEN} from '../custom-providers'
+import {
+  EXTENSION_CONTEXT_TOKEN,
+  TEST_CONTROLLER_TOKEN,
+} from '../custom-providers'
 import {TestCaseInfo} from '../test-info/test-info'
 
 export class TestCaseStore implements OnModuleInit, vscode.Disposable {
   @Inject(EXTENSION_CONTEXT_TOKEN) private readonly ctx: vscode.ExtensionContext
+  @Inject(TEST_CONTROLLER_TOKEN) readonly testController: vscode.TestController
 
-  testController: vscode.TestController
   testCaseMetadata: WeakMap<vscode.TestItem, TestCaseInfo>
 
   // Watcher to update a test item's children.  Key corresponds to the test item ID.
   testItemWatchers: Map<string, vscode.FileSystemWatcher>
 
   constructor() {
-    this.testController = vscode.tests.createTestController(
-      'bazelBSP',
-      'Bazel BSP Tests'
-    )
     this.testCaseMetadata = new WeakMap<vscode.TestItem, TestCaseInfo>()
     this.testItemWatchers = new Map()
   }

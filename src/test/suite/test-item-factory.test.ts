@@ -5,6 +5,7 @@ import {beforeEach, afterEach} from 'mocha'
 import {
   outputChannelProvider,
   contextProviderFactory,
+  TEST_CONTROLLER_TOKEN,
 } from '../../custom-providers'
 import {TestResolver} from '../../test-explorer/resolver'
 import {TestCaseStore} from '../../test-explorer/store'
@@ -33,7 +34,14 @@ suite('Test Item Factory', () => {
     ctx = {subscriptions: []} as unknown as vscode.ExtensionContext
     const moduleRef = await Test.createTestingModule({
       providers: [contextProviderFactory(ctx), TestCaseStore, TestItemFactory],
-    }).compile()
+    })
+      .useMocker(token => {
+        if (token === TEST_CONTROLLER_TOKEN) {
+          return vscode.tests.createTestController('testItemTestController', '')
+        }
+        throw new Error('No mock available for token.')
+      })
+      .compile()
     testCaseStore = moduleRef.get(TestCaseStore)
     testItemFactory = moduleRef.get(TestItemFactory)
   })
