@@ -56,17 +56,28 @@ export class BazelBSPInstaller {
       return false
     }
 
-    // User prompt before proceeding.
-    const installSelection: vscode.MessageItem = {title: 'Install BSP'}
-    const userSelection =
-      await vscode.window.showErrorMessage<vscode.MessageItem>(
-        `Do you want to install the Bazel Build Server in ${root}?`,
-        installSelection,
-        {title: 'Cancel', isCloseAffordance: true}
-      )
+    const installMode = getExtensionSetting(SettingName.SERVER_INSTALL_MODE)
+    if (installMode === 'Prompt') {
+      // User prompt before proceeding.
+      const installSelection: vscode.MessageItem = {title: 'Install BSP'}
+      const userSelection =
+        await vscode.window.showErrorMessage<vscode.MessageItem>(
+          `Do you want to install the Bazel Build Server in ${root}?`,
+          installSelection,
+          {title: 'Cancel', isCloseAffordance: true}
+        )
 
-    if (userSelection?.title !== installSelection.title) {
-      this.outputChannel.appendLine(`Installation in ${root} declined by user`)
+      if (userSelection?.title !== installSelection.title) {
+        this.outputChannel.appendLine(
+          `Installation in ${root} declined by user`
+        )
+        return false
+      }
+    } else if (installMode !== 'Auto') {
+      // Installation is disabled by setting.
+      this.outputChannel.appendLine(
+        `Installation in ${root} skipped because '${SettingName.SERVER_INSTALL_MODE}' setting is set to ${installMode}`
+      )
       return false
     }
 

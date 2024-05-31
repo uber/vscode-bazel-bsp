@@ -57,6 +57,21 @@
           "type": "string",
           "default": "tools/bazel",
           "description": "Bazel binary path (relative to repository root).  Will be used when generating a new .bazelproject file."
+        },
+        "bazelbsp.serverInstallMode": {
+          "type": "string",
+          "default": "Prompt",
+          "enum": [
+            "Auto",
+            "Prompt",
+            "Disabled"
+          ],
+          "enumDescriptions": [
+            "Automatically download and install BSP server at the root of a repo if not present.",
+            "Prompt user to install BSP server if not already present.",
+            "Do not install BSP server if not already present."
+          ],
+          "description": "Installation behavior for the build server."
         }
       }
     }
