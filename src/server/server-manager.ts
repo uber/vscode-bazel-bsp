@@ -62,7 +62,7 @@ export class BuildServerManager implements vscode.Disposable, OnModuleInit {
       }
       const connDetails = await this.connectionDetailsWithInstallCheck(rootDir)
       if (!connDetails) {
-        this.outputChannel.appendLine(
+        this.connectionReject(
           'Unable to find connection details for Bazel BSP. Please ensure the server is installed.'
         )
         return

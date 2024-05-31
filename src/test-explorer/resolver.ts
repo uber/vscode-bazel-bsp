@@ -4,7 +4,10 @@ import path from 'path'
 
 import {TestCaseStore} from './store'
 import {BazelBSPBuildClient} from './client'
-import {EXTENSION_CONTEXT_TOKEN} from '../custom-providers'
+import {
+  EXTENSION_CONTEXT_TOKEN,
+  PRIMARY_OUTPUT_CHANNEL_TOKEN,
+} from '../custom-providers'
 import {BuildServerManager, CANCEL_ERROR_CODE} from '../server/server-manager'
 import * as bsp from '../bsp/bsp'
 import {
@@ -26,6 +29,8 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
   @Inject(TestItemFactory) private readonly testItemFactory: TestItemFactory
   @Inject(LanguageToolManager)
   private readonly languageToolManager: LanguageToolManager
+  @Inject(PRIMARY_OUTPUT_CHANNEL_TOKEN)
+  private readonly outputChannel: vscode.OutputChannel
 
   onModuleInit() {
     this.ctx.subscriptions.push(this)
@@ -62,7 +67,15 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
           notificationCancel
         )
         if (parentTest === undefined) {
-          this.resolveRoot()
+          try {
+            await this.buildServer.getConnection()
+            this.resolveRoot()
+          } catch (e) {
+            this.outputChannel.appendLine(
+              'Test explorer disabled due to lack of available build server.'
+            )
+          }
+
           return
         }
 

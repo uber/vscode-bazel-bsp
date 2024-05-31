@@ -69,6 +69,8 @@ suite('BSP Installer', () => {
       .returns('projectview.bazelproject')
       .withArgs(settings.SettingName.BSP_SERVER_VERSION)
       .returns('2.0.0')
+      .withArgs(settings.SettingName.SERVER_INSTALL_MODE)
+      .returns('Prompt')
 
     // Simulated data returned by coursier download request.
     const sampleData = 'sample data'
@@ -101,6 +103,8 @@ suite('BSP Installer', () => {
       .returns('projectview.bazelproject')
       .withArgs(settings.SettingName.BSP_SERVER_VERSION)
       .returns('2.0.0')
+      .withArgs(settings.SettingName.SERVER_INSTALL_MODE)
+      .returns('Prompt')
 
     sandbox.stub(axios.default, 'get').rejects(new Error('sample error'))
 
@@ -126,6 +130,8 @@ suite('BSP Installer', () => {
       .returns('projectview.bazelproject')
       .withArgs(settings.SettingName.BSP_SERVER_VERSION)
       .returns('2.0.0')
+      .withArgs(settings.SettingName.SERVER_INSTALL_MODE)
+      .returns('Prompt')
 
     const writeFileSpy = sandbox.spy(fs, 'writeFile')
     const installResult = await bazelBSPInstaller.install()
@@ -137,9 +143,22 @@ suite('BSP Installer', () => {
   })
 
   test('user decline', async () => {
+    sandbox
+      .stub(settings, 'getExtensionSetting')
+      .withArgs(settings.SettingName.SERVER_INSTALL_MODE)
+      .returns('Prompt')
     sandbox.stub(vscode.window, 'showErrorMessage').resolves({title: 'other'})
     sandbox.stub(axios.default, 'get').resolves({data: 'sample data'} as any)
-    const actualInitResult = await bazelBSPInstaller.install()
-    assert.ok(!actualInitResult)
+    const actualInstallResult = await bazelBSPInstaller.install()
+    assert.ok(!actualInstallResult)
+  })
+
+  test('install disabled', async () => {
+    sandbox
+      .stub(settings, 'getExtensionSetting')
+      .withArgs(settings.SettingName.SERVER_INSTALL_MODE)
+      .returns('Disabled')
+    const actualInstallResult = await bazelBSPInstaller.install()
+    assert.ok(!actualInstallResult)
   })
 })
