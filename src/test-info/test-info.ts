@@ -23,8 +23,7 @@ export enum TestItemType {
 export class TestCaseInfo {
   public readonly type: TestItemType
   public readonly target: BuildTarget | undefined
-
-  protected testItem: vscode.TestItem
+  public readonly testItem: vscode.TestItem
 
   constructor(
     test: vscode.TestItem,
@@ -127,32 +126,23 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
     return params
   }
 
+  /**
+   * Update the test item's status based on the result of the test run.
+   * This implementation updates the status of the target itself, and then updates all pending children that are not targets of their own.
+   * @param currentRun TestRunTracker for the current test run.
+   * @param result TestResult returned by this run's request to the build server.
+   */
   processTestRunResult(currentRun: TestRunTracker, result: TestResult): void {
-    const updateStatus = (item: vscode.TestItem) => {
-      switch (result.statusCode) {
-        case StatusCode.Ok:
-          currentRun.updateStatus(item, TestCaseStatus.Passed)
-          break
-        case StatusCode.Error:
-          currentRun.updateStatus(
-            item,
-            TestCaseStatus.Failed,
-            // TODO(IDE-979): Test message processing and overlay.
-            new vscode.TestMessage(JSON.stringify(result.data))
-          )
-          break
-        case StatusCode.Cancelled:
-          currentRun.updateStatus(item, TestCaseStatus.Skipped)
-          break
-      }
-    }
-
-    updateStatus(this.testItem)
+    updateStatus(this.testItem, currentRun, result)
 
     // All children that are still pending by this point inherit the overall run status.
-    // When task notifications are implemented for individual test cases, we can re-evaluate what makes the most sense here.
-    for (const child of currentRun.pendingChildrenIterator(this.testItem)) {
-      updateStatus(child)
+    for (const child of currentRun.pendingChildrenIterator(
+      this.testItem,
+      TestItemType.BazelTarget
+    )) {
+      // Only update children that are more specific than this item's type.
+      // This will leave other targets in a pending state so they can run on their own.
+      updateStatus(child.testItem, currentRun, result)
     }
   }
 
@@ -201,7 +191,7 @@ export class SourceDirTestCaseInfo extends BuildTargetTestCaseInfo {
  */
 export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
   public readonly type: TestItemType
-  private details: DocumentTestItem
+  protected details: DocumentTestItem
 
   constructor(test: vscode.TestItem, target: BuildTarget) {
     super(test, target)
@@ -233,6 +223,20 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
   }
 
   /**
+   * Update the status of all pending children with the overall test run result.
+   * For items that are source files or more specific, all children should be updated so they do not run separately on their own.
+   * @param currentRun TestRunTracker for the current test run.
+   * @param result TestResult returned by this run's request to the build server.
+   */
+  processTestRunResult(currentRun: TestRunTracker, result: TestResult): void {
+    updateStatus(this.testItem, currentRun, result)
+
+    for (const child of currentRun.pendingChildrenIterator(this.testItem)) {
+      updateStatus(child.testItem, currentRun, result)
+    }
+  }
+
+  /**
    * Update the document's test item details.
    * @param details DocumentTestItem representing a test item for the full document.
    */
@@ -247,9 +251,8 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
  * Test case information for a single test case within a file.
  * Includes the applicable test filter to run only this test case.
  */
-export class TestItemTestCaseInfo extends BuildTargetTestCaseInfo {
+export class TestItemTestCaseInfo extends SourceFileTestCaseInfo {
   public readonly type: TestItemType
-  private readonly details: DocumentTestItem
 
   constructor(
     test: vscode.TestItem,
@@ -284,5 +287,28 @@ export class TestItemTestCaseInfo extends BuildTargetTestCaseInfo {
    */
   setDisplayName(relativeToItem?: TestCaseInfo | undefined) {
     this.testItem.label = this.details.name
+  }
+}
+
+function updateStatus(
+  item: vscode.TestItem,
+  currentRun: TestRunTracker,
+  result: TestResult
+) {
+  switch (result.statusCode) {
+    case StatusCode.Ok:
+      currentRun.updateStatus(item, TestCaseStatus.Passed)
+      break
+    case StatusCode.Error:
+      currentRun.updateStatus(
+        item,
+        TestCaseStatus.Failed,
+        // TODO(IDE-979): Test message processing and overlay.
+        new vscode.TestMessage(JSON.stringify(result.data))
+      )
+      break
+    case StatusCode.Cancelled:
+      currentRun.updateStatus(item, TestCaseStatus.Skipped)
+      break
   }
 }

@@ -281,19 +281,18 @@ suite('TestInfo', () => {
 
   suite('Test Run Result', () => {
     let testItem: vscode.TestItem
-    let testInfo: TestCaseInfo
     let currentRun: sinon.SinonStubbedInstance<TestRunTracker>
 
     beforeEach(() => {
       testItem = testController.createTestItem('sample', 'sample')
-      testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
 
       currentRun = sandbox.createStubInstance(TestRunTracker)
       currentRun.pendingChildrenIterator.returns((function* (parent) {})())
       sandbox.stub(currentRun, 'originName').get(() => 'sample')
     })
 
-    test('ok result', async () => {
+    test('ok result, build target', async () => {
+      const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
       const bspResult: TestResult = {
         statusCode: StatusCode.Ok,
         originId: 'sample',
@@ -305,9 +304,36 @@ suite('TestInfo', () => {
           TestCaseStatus.Passed
         )
       )
+
+      assert.ok(
+        currentRun.pendingChildrenIterator.calledOnceWithExactly(
+          testItem,
+          TestItemType.BazelTarget
+        )
+      )
+    })
+
+    test('ok result, source file', async () => {
+      const testInfo = new SourceFileTestCaseInfo(testItem, sampleTarget)
+      const bspResult: TestResult = {
+        statusCode: StatusCode.Ok,
+        originId: 'sample',
+      }
+      testInfo.processTestRunResult(currentRun, bspResult)
+      assert.ok(
+        currentRun.updateStatus.calledOnceWithExactly(
+          testItem,
+          TestCaseStatus.Passed
+        )
+      )
+
+      assert.ok(
+        currentRun.pendingChildrenIterator.calledOnceWithExactly(testItem)
+      )
     })
 
     test('error result', async () => {
+      const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
       const bspResult: TestResult = {
         statusCode: StatusCode.Error,
         originId: 'sample',
@@ -322,6 +348,7 @@ suite('TestInfo', () => {
     })
 
     test('cancelled result', async () => {
+      const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
       const bspResult: TestResult = {
         statusCode: StatusCode.Cancelled,
         originId: 'sample',

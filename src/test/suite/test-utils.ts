@@ -33,6 +33,15 @@ export const sampleTestData = [
     children: [
       {id: 'test1_1', label: 'Test 1.1', type: TestItemType.TestCase},
       {id: 'test1_2', label: 'Test 1.2', type: TestItemType.TestCase},
+      {
+        id: 'target3',
+        label: 'Target 3',
+        children: [
+          {id: 'test1_1', label: 'Test 1.1', type: TestItemType.TestCase},
+          {id: 'test1_2', label: 'Test 1.2', type: TestItemType.TestCase},
+        ],
+        type: TestItemType.BazelTarget,
+      },
     ],
     type: TestItemType.BazelTarget,
   },
