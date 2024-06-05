@@ -12,10 +12,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onLanguage:python",
-    "onLanguage:java",
-    "onLanguage:kotlin",
-    "onLanguage:scala"
+    "workspaceContains:**/*.{java,scala,python,kotlin}"
   ],
   "main": "./dist/extension.js",
   "contributes": {
