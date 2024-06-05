@@ -21,7 +21,7 @@ export enum TestCaseStatus {
 
 export class TestRunTracker implements TaskOriginHandlers {
   // All tests that are included in this run. See iterator definition below.
-  private allTests: Map<TestItemType, vscode.TestItem[]>
+  private allTests: Map<TestItemType, TestCaseInfo[]>
 
   // Current status of each TestItem in the run, initially Pending for all TestItems.
   private status: Map<vscode.TestItem, TestCaseStatus>
@@ -43,7 +43,7 @@ export class TestRunTracker implements TaskOriginHandlers {
     cancelToken: vscode.CancellationToken,
     coverageTracker: CoverageTracker
   ) {
-    this.allTests = new Map<TestItemType, vscode.TestItem[]>()
+    this.allTests = new Map<TestItemType, TestCaseInfo[]>()
     this.status = new Map<vscode.TestItem, TestCaseStatus>()
     this.testCaseMetadata = testCaseMetadata
     this.run = run
@@ -76,7 +76,7 @@ export class TestRunTracker implements TaskOriginHandlers {
   ) {
     // All items below the roots of the TestRunRequest will be shown as enqueued.
     for (const item of this) {
-      this.run.enqueued(item)
+      this.run.enqueued(item.testItem)
     }
 
     // Run the callback for each test case.
@@ -89,12 +89,12 @@ export class TestRunTracker implements TaskOriginHandlers {
       }
 
       const initialStatus = TestCaseStatus.Started
-      this.updateStatus(item, initialStatus)
-      await callback(item, this.cancelToken)
+      this.updateStatus(item.testItem, initialStatus)
+      await callback(item.testItem, this.cancelToken)
 
-      if (this.status.get(item) === initialStatus) {
+      if (this.status.get(item.testItem) === initialStatus) {
         // If an updated status has not been set by the callback, consider it skipped.
-        this.updateStatus(item, TestCaseStatus.Skipped)
+        this.updateStatus(item.testItem, TestCaseStatus.Skipped)
       }
     }
 
@@ -191,27 +191,30 @@ export class TestRunTracker implements TaskOriginHandlers {
    * Iterate recursively through all children of the given test item, and collect them in the destination map.
    * @param destination Map to be populated with the collected test items, grouped by TestItemType.
    * @param item root item at which to begin traversal. The root item will also be included in the map.
+   * @param filterLevel (optional) TestItemType which will be used as the cutoff for filtering. Items at or above this level will be excluded.
    */
   private recursivelyCollectChildren(
-    destination: Map<TestItemType, vscode.TestItem[]>,
-    item: vscode.TestItem
+    destination: Map<TestItemType, TestCaseInfo[]>,
+    item: vscode.TestItem,
+    filterLevel?: TestItemType
   ) {
     const collectChildren = (currentItem: vscode.TestItem) => {
       const data = this.testCaseMetadata.get(currentItem)
-      this.status.set(currentItem, TestCaseStatus.Pending)
-
       if (!data) return
+      if (filterLevel !== undefined && data.type <= filterLevel) return
 
-      // Recursively collect children.
-      currentItem.children.forEach(child => collectChildren(child))
+      this.status.set(currentItem, TestCaseStatus.Pending)
 
       // Add each test item to the appropriate map entry based on its TestItemType.
       const existingEntry = destination.get(data.type)
       if (!existingEntry) {
-        destination.set(data.type, [currentItem])
+        destination.set(data.type, [data])
       } else {
-        existingEntry.push(currentItem)
+        existingEntry.push(data)
       }
+
+      // Recursively collect children.
+      currentItem.children.forEach(child => collectChildren(child))
     }
     collectChildren(item)
   }
@@ -231,13 +234,17 @@ export class TestRunTracker implements TaskOriginHandlers {
    * Iterates through all pending test cases below the given test item, ordered by TestItemType.
    * This can be used for updates to the tree below a certain parent.
    * @param parent Parent test item whose children will be included in the iteration sequence.
+   * @param filterLevel (optional) TestItemType which will be used as the cutoff for filtering. Items at or above this level will be excluded.
    * @returns Iterable sequence of pending children below the given parent.
    */
-  *pendingChildrenIterator(parent: vscode.TestItem) {
+  *pendingChildrenIterator(
+    parent: vscode.TestItem,
+    filterLevel?: TestItemType
+  ) {
     // Recursively collect all children of this test case into a map grouped by TestItemType.
-    const currentChildren = new Map<TestItemType, vscode.TestItem[]>()
+    const currentChildren = new Map<TestItemType, TestCaseInfo[]>()
     parent.children.forEach(child => {
-      this.recursivelyCollectChildren(currentChildren, child)
+      this.recursivelyCollectChildren(currentChildren, child, filterLevel)
     })
 
     // Use the existing pendingItems iteration sequence to pass through only the relevant children.
@@ -253,14 +260,14 @@ export class TestRunTracker implements TaskOriginHandlers {
    * @param allItems All test items to be visited in this iteration sequence, organized their TestItemType.
    */
   private *pendingTestItemIterator(
-    allItems: Map<TestItemType, vscode.TestItem[]>
+    allItems: Map<TestItemType, TestCaseInfo[]>
   ) {
     for (const key of Object.keys(TestItemType)) {
       const testItemType = TestItemType[key]
       const testItems = allItems.get(testItemType)
       if (testItems) {
         for (const item of testItems) {
-          if (this.status.get(item) === TestCaseStatus.Pending) {
+          if (this.status.get(item.testItem) === TestCaseStatus.Pending) {
             yield item
           }
         }

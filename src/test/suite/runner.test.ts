@@ -114,7 +114,7 @@ suite('Test Runner', () => {
       {include: requestedTestItems, exclude: [], profile: runProfile},
       new vscode.CancellationTokenSource().token
     )
-    assert.equal(connStub.callCount, 2)
+    assert.equal(connStub.callCount, 3)
   })
 
   test('Test Run with Coverage', async () => {
@@ -139,7 +139,7 @@ suite('Test Runner', () => {
       {include: requestedTestItems, exclude: [], profile: runProfile},
       new vscode.CancellationTokenSource().token
     )
-    assert.equal(connStub.callCount, 2)
+    assert.equal(connStub.callCount, 3)
     for (const callArgs of connStub.args) {
       assert.ok(callArgs[1].data.coverage)
       assert.strictEqual(callArgs[1].dataKind, TestParamsDataKind.BazelTest)

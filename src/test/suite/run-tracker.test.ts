@@ -115,7 +115,7 @@ suite('Test Run Tracker', () => {
     })
 
     // Items stop executing after the point of cancellation.
-    assert.equal(remainingItems.size, runItemCount)
+    assert.equal(remainingItems.size, createdTestItems.length - runItemCount)
     assert.equal(runSpy.enqueued.callCount, createdTestItems.length)
     assert.equal(runSpy.started.callCount, runItemCount)
     assert.equal(runSpy.passed.callCount, runItemCount)
@@ -131,8 +131,11 @@ suite('Test Run Tracker', () => {
       assert.ok(itemMetadata)
       if (includedTypes.has(itemMetadata.type)) {
         // Simulate a callback that updates the status of children.
-        for (const child of testRunner.pendingChildrenIterator(item)) {
-          testRunner.updateStatus(child, TestCaseStatus.Passed)
+        for (const child of testRunner.pendingChildrenIterator(
+          item,
+          itemMetadata.type
+        )) {
+          testRunner.updateStatus(child.testItem, TestCaseStatus.Passed)
         }
       }
       remainingItems.delete(item)
@@ -154,6 +157,25 @@ suite('Test Run Tracker', () => {
       runSpy.skipped.callCount,
       createdTestItems.length - nonIncludedItems.length
     )
+  })
+
+  test('filtered pending children', async () => {
+    const remainingItems = new Set(createdTestItems)
+    const includedTypes: Set<TestItemType | undefined> = new Set([
+      TestItemType.BazelTarget,
+    ])
+    await testRunner.executeRun(async item => {
+      const itemMetadata = metadata.get(item)
+      assert.ok(itemMetadata)
+      remainingItems.delete(item)
+    })
+
+    for (const item of testRunner.pendingChildrenIterator(
+      createdTestItems[0],
+      TestItemType.BazelTarget
+    )) {
+      assert.ok(item.type > TestItemType.BazelTarget)
+    }
   })
 
   test('execute run with no pending items', async () => {
