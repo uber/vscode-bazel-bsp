@@ -1,14 +1,26 @@
 import * as vscode from 'vscode'
 
 import {TestCaseInfo, TestItemType} from '../test-info/test-info'
-import {LogMessageParams} from '../bsp/bsp'
+import {
+  BuildTarget,
+  LogMessageParams,
+  TaskFinishDataKind,
+  TaskFinishParams,
+  TaskStartParams,
+  TestFinish,
+  TestStatus,
+} from '../bsp/bsp'
 import {TaskOriginHandlers} from '../test-explorer/client'
 import {
   PublishOutputDataKind,
   PublishOutputParams,
   TestCoverageReport,
+  TestFinishDataKind,
 } from '../bsp/bsp-ext'
 import {CoverageTracker} from '../coverage-utils/coverage-tracker'
+import {LanguageToolManager} from '../language-tools/manager'
+import {TaskEventTracker} from './task-events'
+import {ANSI_CODES} from '../utils/utils'
 
 export enum TestCaseStatus {
   Pending,
@@ -19,9 +31,21 @@ export enum TestCaseStatus {
   Errored,
 }
 
+export interface RunTrackerParams {
+  testCaseMetadata: WeakMap<vscode.TestItem, TestCaseInfo>
+  run: vscode.TestRun
+  request: vscode.TestRunRequest
+  originName: string
+  cancelToken: vscode.CancellationToken
+  coverageTracker: CoverageTracker
+  languageToolManager: LanguageToolManager
+}
+
 export class TestRunTracker implements TaskOriginHandlers {
   // All tests that are included in this run. See iterator definition below.
   private allTests: Map<TestItemType, TestCaseInfo[]>
+  private testsByLookupKey: Map<string, TestCaseInfo>
+  private buildTargets: Map<string, BuildTarget>
 
   // Current status of each TestItem in the run, initially Pending for all TestItems.
   private status: Map<vscode.TestItem, TestCaseStatus>
@@ -33,24 +57,20 @@ export class TestRunTracker implements TaskOriginHandlers {
   private onDoneCallback: () => void
   private cancelToken: vscode.CancellationToken
   private coverageTracker: CoverageTracker
+  private languageToolManager: LanguageToolManager
   private pending: Thenable<void>[] = []
+  private buildTaskTracker: TaskEventTracker = new TaskEventTracker()
 
-  constructor(
-    testCaseMetadata: WeakMap<vscode.TestItem, TestCaseInfo>,
-    run: vscode.TestRun,
-    request: vscode.TestRunRequest,
-    originName: string,
-    cancelToken: vscode.CancellationToken,
-    coverageTracker: CoverageTracker
-  ) {
+  constructor(params: RunTrackerParams) {
     this.allTests = new Map<TestItemType, TestCaseInfo[]>()
     this.status = new Map<vscode.TestItem, TestCaseStatus>()
-    this.testCaseMetadata = testCaseMetadata
-    this.run = run
-    this.request = request
-    this._originName = originName
-    this.cancelToken = cancelToken
-    this.coverageTracker = coverageTracker
+    this.testCaseMetadata = params.testCaseMetadata
+    this.run = params.run
+    this.request = params.request
+    this._originName = params.originName
+    this.cancelToken = params.cancelToken
+    this.coverageTracker = params.coverageTracker
+    this.languageToolManager = params.languageToolManager
 
     this.prepareCurrentRun()
   }
@@ -135,6 +155,54 @@ export class TestRunTracker implements TaskOriginHandlers {
     }
   }
 
+  public onBuildTaskStart(params: TaskStartParams) {
+    this.buildTaskTracker.addTaskStart(params)
+  }
+
+  public onBuildTaskFinish(params: TaskFinishParams) {
+    this.buildTaskTracker.addTaskFinish(params)
+
+    if (params.dataKind !== TaskFinishDataKind.TestFinish) {
+      return
+    }
+
+    const testFinishData = params.data as TestFinish
+    if (testFinishData.dataKind === TestFinishDataKind.JUnitStyleTestCaseData) {
+      const targetTestInfo = this.buildTaskTracker.getBuildTargetId(
+        params.taskId.id
+      )
+      if (!targetTestInfo) {
+        this.run.appendOutput(
+          `Updating ${testFinishData.displayName}: Unable to identify a build target for this result.\n`
+        )
+        return
+      }
+
+      // Determine expected key for this set of testFinishData.
+      const target = this.buildTargets.get(targetTestInfo?.uri)
+      if (!target) {
+        this.run.appendOutput(
+          `Updating ${testFinishData.displayName}: Unable to find information stored for target ${targetTestInfo?.uri}.\n`
+        )
+        return
+      }
+      const key = this.languageToolManager
+        .getLanguageTools(target)
+        .mapTestFinishDataToLookupKey(testFinishData)
+
+      if (!key) {
+        this.run.appendOutput(
+          `Updating ${testFinishData.displayName}: Unable to match this test result to an item in this run.\n`
+        )
+        return
+      }
+
+      // Find the matching item and post the updated status.
+      const item = this.testsByLookupKey.get(key)
+      if (item) this.updateStatusFromTestFinishData(item, testFinishData)
+    }
+  }
+
   /**
    * Appends a log message to this tracker's test run output.
    * @param params Log message to be appended.
@@ -183,7 +251,23 @@ export class TestRunTracker implements TaskOriginHandlers {
     }
 
     for (const testItem of this.request.include) {
-      this.recursivelyCollectChildren(this.allTests, testItem)
+      this.recursivelyCollectChildren(
+        this.allTests,
+        testItem,
+        undefined,
+        TestCaseStatus.Pending
+      )
+    }
+
+    // Make items readily available for lookup.
+    this.testsByLookupKey = new Map<string, TestCaseInfo>()
+    this.buildTargets = new Map<string, BuildTarget>()
+    for (const item of this) {
+      const lookupKey = this.languageToolManager
+        .getLanguageTools(item.target)
+        .mapTestCaseInfoToLookupKey(item)
+      if (lookupKey) this.testsByLookupKey.set(lookupKey, item)
+      if (item.target) this.buildTargets.set(item.target.id.uri, item.target)
     }
   }
 
@@ -192,18 +276,20 @@ export class TestRunTracker implements TaskOriginHandlers {
    * @param destination Map to be populated with the collected test items, grouped by TestItemType.
    * @param item root item at which to begin traversal. The root item will also be included in the map.
    * @param filterLevel (optional) TestItemType which will be used as the cutoff for filtering. Items at or above this level will be excluded.
+   * @param newStatus (optional) Status to be set for each item as it is collected.
    */
   private recursivelyCollectChildren(
     destination: Map<TestItemType, TestCaseInfo[]>,
     item: vscode.TestItem,
-    filterLevel?: TestItemType
+    filterLevel?: TestItemType,
+    newStatus?: TestCaseStatus
   ) {
     const collectChildren = (currentItem: vscode.TestItem) => {
       const data = this.testCaseMetadata.get(currentItem)
+      if (newStatus !== undefined) this.status.set(currentItem, newStatus)
+
       if (!data) return
       if (filterLevel !== undefined && data.type <= filterLevel) return
-
-      this.status.set(currentItem, TestCaseStatus.Pending)
 
       // Add each test item to the appropriate map entry based on its TestItemType.
       const existingEntry = destination.get(data.type)
@@ -274,4 +360,50 @@ export class TestRunTracker implements TaskOriginHandlers {
       }
     }
   }
+
+  private updateStatusFromTestFinishData(
+    item: TestCaseInfo,
+    testFinishData: TestFinish
+  ) {
+    switch (testFinishData.status) {
+      case TestStatus.Skipped:
+      case TestStatus.Ignored:
+        this.updateStatus(item.testItem, TestCaseStatus.Skipped)
+        break
+      case TestStatus.Passed:
+        this.updateStatus(item.testItem, TestCaseStatus.Passed)
+        break
+      case TestStatus.Cancelled:
+        this.updateStatus(
+          item.testItem,
+          TestCaseStatus.Errored,
+          new vscode.TestMessage('Cancelled')
+        )
+        break
+      case TestStatus.Failed:
+        this.updateStatus(
+          item.testItem,
+          TestCaseStatus.Failed,
+          new vscode.TestMessage(formatTestResultMessage(testFinishData))
+        )
+    }
+  }
+}
+
+function formatTestResultMessage(result) {
+  let message = result.message
+    ? `${ANSI_CODES.CYAN}${ANSI_CODES.BOLD}${result.message}${ANSI_CODES.RESET}\n\n`
+    : ''
+
+  if (result.dataKind === TestFinishDataKind.JUnitStyleTestCaseData) {
+    const testCaseData = result.data
+    if (testCaseData.errorType) {
+      message += `${ANSI_CODES.RED}[ERROR TYPE]${ANSI_CODES.RESET} ${testCaseData.errorType}\n\n`
+    }
+    if (testCaseData.fullError) {
+      message += `${ANSI_CODES.RED}[ERROR TYPE]${ANSI_CODES.RESET}\n\n${testCaseData.fullError}\n\n`
+    }
+  }
+
+  return message
 }

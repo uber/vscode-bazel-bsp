@@ -10,8 +10,21 @@ import {
   TestItemType,
 } from '../../test-info/test-info'
 import {sampleBuildTarget, sampleTestData} from './test-utils'
-import {LogMessageParams, MessageType} from '../../bsp/bsp'
+import {
+  LogMessageParams,
+  MessageType,
+  StatusCode,
+  TaskFinishDataKind,
+  TaskFinishParams,
+  TaskStartDataKind,
+  TaskStartParams,
+  TestStart,
+  TestStatus,
+} from '../../bsp/bsp'
 import {CoverageTracker} from '../../coverage-utils/coverage-tracker'
+import {LanguageToolManager} from '../../language-tools/manager'
+import {TestFinishDataKind} from '../../bsp/bsp-ext'
+import {BaseLanguageTools} from '../../language-tools/base'
 
 suite('Test Run Tracker', () => {
   let testRunner: TestRunTracker
@@ -20,6 +33,7 @@ suite('Test Run Tracker', () => {
   let metadata: WeakMap<vscode.TestItem, TestCaseInfo>
   let runSpy: sinon.SinonSpiedInstance<vscode.TestRun>
   let cancelTokenSource: vscode.CancellationTokenSource
+  let languageToolStub: sinon.SinonStubbedInstance<LanguageToolManager>
 
   const sandbox = sinon.createSandbox()
 
@@ -69,15 +83,27 @@ suite('Test Run Tracker', () => {
 
     const run = testController.createTestRun(request)
     const coverageTracker = new CoverageTracker()
-    runSpy = sandbox.spy(run)
-    testRunner = new TestRunTracker(
-      metadata,
-      run,
-      request,
-      'sample',
-      cancelTokenSource.token,
-      coverageTracker
+
+    languageToolStub = sandbox.createStubInstance(LanguageToolManager)
+    const languageToolsInstance = sinon.createStubInstance(BaseLanguageTools)
+    languageToolsInstance.mapTestCaseInfoToLookupKey.callsFake(
+      item => item.testItem.id
     )
+    languageToolsInstance.mapTestFinishDataToLookupKey.callsFake(
+      finishData => finishData.displayName
+    )
+    languageToolStub.getLanguageTools.returns(languageToolsInstance)
+
+    runSpy = sandbox.spy(run)
+    testRunner = new TestRunTracker({
+      testCaseMetadata: metadata,
+      run: run,
+      request: request,
+      originName: 'sample',
+      cancelToken: cancelTokenSource.token,
+      coverageTracker: coverageTracker,
+      languageToolManager: languageToolStub,
+    })
   })
 
   afterEach(() => {
@@ -196,16 +222,18 @@ suite('Test Run Tracker', () => {
     const request = new vscode.TestRunRequest([])
     const run = testController.createTestRun(request)
     const coverageTracker = new CoverageTracker()
-    const emptyTestRunner = new TestRunTracker(
-      metadata,
-      run,
-      request,
-      'sample',
-      cancelTokenSource.token,
-      coverageTracker
-    )
+    const languageToolManager = new LanguageToolManager()
+    const emptyTestRunner = new TestRunTracker({
+      testCaseMetadata: metadata,
+      run: run,
+      request: request,
+      originName: 'sample',
+      cancelToken: cancelTokenSource.token,
+      coverageTracker: coverageTracker,
+      languageToolManager: languageToolManager,
+    })
 
-    await emptyTestRunner.executeRun(async item => {
+    await emptyTestRunner.executeRun(async itesm => {
       assert.fail('Callback should not be called')
     })
 
@@ -236,6 +264,99 @@ suite('Test Run Tracker', () => {
 
     assert.equal(runSpy.skipped.callCount, 1)
     assert.equal(runSpy.skipped.getCall(0).args[0], testItem)
+  })
+
+  test('test task updates', async () => {
+    type SampleEventPair = {
+      start: TaskStartParams
+      finish: TaskFinishParams
+    }
+
+    const sampleEvents: SampleEventPair[] = [
+      {
+        start: {
+          originId: 'sample',
+          taskId: {id: 'task1', parents: []},
+          message: 'task1 started',
+          dataKind: TaskStartDataKind.TestTask,
+          data: {
+            target: {
+              uri: 'sample',
+            },
+          },
+        },
+        finish: {
+          originId: 'sample',
+          taskId: {id: 'task1', parents: []},
+          status: StatusCode.Ok,
+          message: 'task1 finished',
+        },
+      },
+      {
+        start: {
+          originId: 'sample',
+          taskId: {id: 'task2', parents: ['task1']},
+          message: 'task1 started',
+          dataKind: TaskStartDataKind.TestStart,
+        },
+        finish: {
+          originId: 'sample',
+          taskId: {id: 'task2', parents: ['task1']},
+          status: StatusCode.Ok,
+          message: 'task2 finished',
+          dataKind: TaskFinishDataKind.TestFinish,
+          data: {
+            displayName: 'test1_1',
+            status: TestStatus.Passed,
+            dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+            data: {
+              time: 0,
+              className: 'sample',
+              displayName: 'sample test',
+            },
+          },
+        },
+      },
+      {
+        start: {
+          originId: 'sample',
+          taskId: {id: 'task3', parents: ['task1']},
+          message: 'task3 started',
+          dataKind: TaskStartDataKind.TestStart,
+        },
+        finish: {
+          originId: 'sample',
+          taskId: {id: 'task3', parents: ['task1']},
+          status: StatusCode.Ok,
+          message: 'task3 finished',
+          dataKind: TaskFinishDataKind.TestFinish,
+          data: {
+            displayName: 'test1_2',
+            status: TestStatus.Failed,
+            dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+            data: {
+              time: 0,
+              className: 'sample',
+              displayName: 'sample test',
+            },
+          },
+        },
+      },
+    ]
+
+    // Start each task.
+    for (let i = 0; i < sampleEvents.length; i++) {
+      testRunner.onBuildTaskStart(sampleEvents[i].start)
+    }
+
+    // Finish each task, in opposite order.
+    for (let i = sampleEvents.length - 1; i >= 0; i--) {
+      testRunner.onBuildTaskFinish(sampleEvents[i].finish)
+    }
+
+    assert.ok(languageToolStub.getLanguageTools.called)
+    assert.equal(runSpy.passed.callCount, 1)
+    assert.equal(runSpy.failed.callCount, 1)
   })
 
   test('log message', async () => {

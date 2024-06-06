@@ -3,7 +3,7 @@ import * as path from 'path'
 import {BuildTarget, TestParams, TestResult, StatusCode} from '../bsp/bsp'
 import {TestParamsDataKind, BazelTestParamsData} from '../bsp/bsp-ext'
 import {TestCaseStatus, TestRunTracker} from '../test-runner/run-tracker'
-import {DocumentTestItem} from '../language-tools/manager'
+import {DocumentTestItem, LanguageToolManager} from '../language-tools/manager'
 
 export enum TestItemType {
   Root,
@@ -244,6 +244,10 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
     this.details = details
     this.testItem.range = details.range
     this.setDisplayName()
+  }
+
+  getDocumentTestItem() {
+    return this.details
   }
 }
 

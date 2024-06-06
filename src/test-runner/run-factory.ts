@@ -6,12 +6,15 @@ import {TestCaseStore} from '../test-explorer/store'
 import {TestRunTracker} from './run-tracker'
 import {BazelBSPBuildClient} from '../test-explorer/client'
 import {CoverageTracker} from '../coverage-utils/coverage-tracker'
+import {LanguageToolManager} from '../language-tools/manager'
 
 @Injectable()
 export class RunTrackerFactory {
   @Inject(TestCaseStore) private readonly testCaseStore: TestCaseStore
   @Inject(BazelBSPBuildClient) private readonly buildClient: BazelBSPBuildClient
   @Inject(CoverageTracker) private readonly coverageTracker: CoverageTracker
+  @Inject(LanguageToolManager)
+  private readonly languageToolManager: LanguageToolManager
 
   /**
    * Creates a new test run tracker, and register it with the build client.
@@ -24,14 +27,15 @@ export class RunTrackerFactory {
   ): TestRunTracker {
     const originId = randomUUID()
     const run = this.testCaseStore.testController.createTestRun(request)
-    const requestTracker = new TestRunTracker(
-      this.testCaseStore.testCaseMetadata,
-      run,
-      request,
-      originId,
-      cancelToken,
-      this.coverageTracker
-    )
+    const requestTracker = new TestRunTracker({
+      testCaseMetadata: this.testCaseStore.testCaseMetadata,
+      run: run,
+      request: request,
+      originName: originId,
+      cancelToken: cancelToken,
+      coverageTracker: this.coverageTracker,
+      languageToolManager: this.languageToolManager,
+    })
 
     this.buildClient.registerOriginHandlers(originId, requestTracker)
     requestTracker.onDone(() =>

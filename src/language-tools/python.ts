@@ -2,10 +2,16 @@ import * as vscode from 'vscode'
 import * as path from 'path'
 
 import {DocumentTestItem, LanguageTools, TestFileContents} from './manager'
+import {TestFinish} from '../bsp/bsp'
+import {SourceFileTestCaseInfo, TestCaseInfo} from '../test-info/test-info'
+import {BaseLanguageTools} from './base'
 
 const TEST_FILE_REGEX = /^(test_.+\.py|.+_test\.py)$/
 
-export class PythonLanguageTools implements LanguageTools {
+export class PythonLanguageTools
+  extends BaseLanguageTools
+  implements LanguageTools
+{
   /**
    * Identification of Python test cases.
    * @param document URI of the document to be analyzed for test cases.
