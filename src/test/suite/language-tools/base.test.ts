@@ -7,6 +7,8 @@ import {PythonLanguageTools} from '../../../language-tools/python'
 import sinon from 'sinon'
 import Sinon from 'sinon'
 import {BaseLanguageTools} from '../../../language-tools/base'
+import {TestFinish, TestStatus} from '../../../bsp/bsp'
+import {TestFinishDataKind} from '../../../bsp/bsp-ext'
 
 suite('Base Language Tools', () => {
   let languageTools: LanguageTools
@@ -29,6 +31,19 @@ suite('Base Language Tools', () => {
     )
     assert.strictEqual(result.isTestFile, true)
     assert.strictEqual(result.testCases.length, 0)
+  })
+
+  test('map test finish data to lookup key', async () => {
+    let result = languageTools.mapTestFinishDataToLookupKey({
+      displayName: 'myTest',
+      status: TestStatus.Failed,
+      dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+      data: {
+        time: 0,
+        className: 'com.example.ClassName',
+      },
+    })
+    assert.strictEqual(result, undefined)
   })
 })
 

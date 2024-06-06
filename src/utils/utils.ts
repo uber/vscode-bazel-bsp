@@ -13,6 +13,13 @@ const CSI_SEQUENCE =
   // eslint-disable-next-line no-control-regex
   /(:?(:?\x1b\[|\x9B)[=?>!]?[\d;:]*["$#'* ]?[a-zA-Z@^`{}|~])|(:?\x1b\].*?\x07)/g
 
+export enum ANSI_CODES {
+  RED = '\u001b[31m',
+  CYAN = '\u001b[36m',
+  BOLD = '\u001b[1m',
+  RESET = '\u001b[0m',
+}
+
 export class Utils {
   static getWorkspaceRoot(): vscode.Uri | null {
     if (

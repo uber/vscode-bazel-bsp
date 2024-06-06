@@ -1,10 +1,11 @@
 import * as vscode from 'vscode'
 import {Injectable} from '@nestjs/common'
 
-import {BuildTarget} from '../bsp/bsp'
+import {BuildTarget, TestFinish} from '../bsp/bsp'
 import {PythonLanguageTools} from './python'
 import {BaseLanguageTools} from './base'
 import {JavaLanguageTools} from './java'
+import {TestCaseInfo} from '../test-info/test-info'
 
 /**
  * LanguageTools is used to define behavior that should differ based on language.
@@ -13,6 +14,10 @@ import {JavaLanguageTools} from './java'
 export interface LanguageTools {
   // Get a document's test cases and convert them into an intermediate format for use in test case creation.
   getDocumentTestCases(document: vscode.Uri): Promise<TestFileContents>
+  // Maps test finish data into a unique key that can be used to find an individual test case in a run.
+  mapTestFinishDataToLookupKey(testFinishData: TestFinish): string | undefined
+  // Maps test case info into a unique key  that can be used to find an individual test case in a run.
+  mapTestCaseInfoToLookupKey(testCaseInfo: TestCaseInfo): string | undefined
 }
 
 // Results from analyzing a test file.
@@ -37,10 +42,10 @@ export class LanguageToolManager {
   private pythonLanguageTools = new PythonLanguageTools()
   private javaLanguageTools = new JavaLanguageTools()
 
-  getLanguageTools(target: BuildTarget): LanguageTools {
-    if (target.languageIds.find(val => val === 'python')) {
+  getLanguageTools(target: BuildTarget | undefined): LanguageTools {
+    if (target?.languageIds.find(val => val === 'python')) {
       return this.pythonLanguageTools
-    } else if (target.languageIds.find(val => val === 'java')) {
+    } else if (target?.languageIds.find(val => val === 'java')) {
       return this.javaLanguageTools
     }
     return this.baseLanguageTools

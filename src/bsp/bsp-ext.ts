@@ -57,3 +57,15 @@ export function registerExtendedBuildClientHandlers(
     handlers.onBuildPublishOutput.bind(handlers)
   )
 }
+
+export namespace TestFinishDataKind {
+  export const JUnitStyleTestCaseData = 'junit-style-test-case-data'
+}
+
+export interface JUnitStyleTestCaseData {
+  time: number
+  className?: string
+  pkg?: string
+  fullError?: string
+  errorType?: string
+}

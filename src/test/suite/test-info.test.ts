@@ -119,6 +119,7 @@ suite('TestInfo', () => {
 
       const testInfo = new SourceFileTestCaseInfo(testItem, sampleTarget)
       testInfo.setDocumentTestItem(sampleDetails)
+      assert.deepStrictEqual(testInfo.getDocumentTestItem(), sampleDetails)
 
       for (const testCase of testCases) {
         const currentRun = sandbox.createStubInstance(TestRunTracker)

@@ -2,6 +2,9 @@ import * as vscode from 'vscode'
 import * as path from 'path'
 
 import {DocumentTestItem, LanguageTools, TestFileContents} from './manager'
+import {TestFinish} from '../bsp/bsp'
+import {JUnitStyleTestCaseData, TestFinishDataKind} from '../bsp/bsp-ext'
+import {SourceFileTestCaseInfo, TestCaseInfo} from '../test-info/test-info'
 
 const TEST_FILE_REGEX = /^(Test.+\.java|.+Test\.java)$/
 const JAVA_TEST_REGEX =
@@ -10,6 +13,40 @@ const PACKAGE_NAME_REGEX =
   /package\s+(?<packageName>([a-zA-Z_][a-zA-Z0-9_]*)(\.[a-zA-Z_][a-zA-Z0-9_]*)*);/
 
 export class JavaLanguageTools implements LanguageTools {
+  /**
+   * Maps testFinishData into a unique identifier for each test case.
+   * @param testFinishData TestFinish data reported by the build server.
+   * @returns Lookup key to find this test case in the TestRunTracker.
+   */
+  mapTestFinishDataToLookupKey(testFinishData: TestFinish): string | undefined {
+    if (testFinishData.dataKind === TestFinishDataKind.JUnitStyleTestCaseData) {
+      const testCaseData = testFinishData.data as JUnitStyleTestCaseData
+      if (testCaseData.className !== undefined) {
+        return `${testCaseData.className}.${testFinishData.displayName}`
+      } else {
+        return testFinishData.displayName
+      }
+    }
+    return undefined
+  }
+
+  /**
+   * Maps a TestCaseValue into a standard lookup key in the TestRunTracker.
+   * @param testCaseInfo Test case information to be converted into a lookup key.
+   * @returns Lookup key which will be used to identify this test case in the TestRunTracker.
+   */
+  mapTestCaseInfoToLookupKey(testCaseInfo: TestCaseInfo): string | undefined {
+    // Check whether a key is relevant to this TestCase, and return if applicable.
+    if (testCaseInfo instanceof SourceFileTestCaseInfo) {
+      const data = testCaseInfo.getDocumentTestItem()
+      return data.testFilter
+    }
+
+    // For other test case types, e.g. those above an individual source file level, they won't be added to the lookup table.
+    // Their children, if present, will also be visited and captured instead.
+    return undefined
+  }
+
   /**
    * Identification of Java test cases.
    * @param document URI of the document to be analyzed for test cases.
