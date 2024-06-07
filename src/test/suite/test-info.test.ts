@@ -314,25 +314,6 @@ suite('TestInfo', () => {
       )
     })
 
-    test('ok result, source file', async () => {
-      const testInfo = new SourceFileTestCaseInfo(testItem, sampleTarget)
-      const bspResult: TestResult = {
-        statusCode: StatusCode.Ok,
-        originId: 'sample',
-      }
-      testInfo.processTestRunResult(currentRun, bspResult)
-      assert.ok(
-        currentRun.updateStatus.calledOnceWithExactly(
-          testItem,
-          TestCaseStatus.Passed
-        )
-      )
-
-      assert.ok(
-        currentRun.pendingChildrenIterator.calledOnceWithExactly(testItem)
-      )
-    })
-
     test('error result', async () => {
       const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
       const bspResult: TestResult = {

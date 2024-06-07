@@ -12,7 +12,7 @@
     "Other"
   ],
   "activationEvents": [
-    "workspaceContains:**/*.{java,scala,python,kotlin}"
+    "workspaceContains:**/*.{java,scala,py,kt}"
   ],
   "main": "./dist/extension.js",
   "contributes": {

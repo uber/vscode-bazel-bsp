@@ -31,6 +31,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
   private readonly languageToolManager: LanguageToolManager
   @Inject(PRIMARY_OUTPUT_CHANNEL_TOKEN)
   private readonly outputChannel: vscode.OutputChannel
+  private repoRoot: string | null
 
   onModuleInit() {
     this.ctx.subscriptions.push(this)
@@ -126,9 +127,9 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       SettingName.BAZEL_PROJECT_FILE_PATH
     )
 
-    const repoRoot = await Utils.getWorkspaceGitRoot()
-    if (projectViewRelPath && repoRoot) {
-      const projectViewAbsPath = path.resolve(repoRoot, projectViewRelPath)
+    this.repoRoot = await Utils.getWorkspaceGitRoot()
+    if (projectViewRelPath && this.repoRoot) {
+      const projectViewAbsPath = path.resolve(this.repoRoot, projectViewRelPath)
       projectViewUri = vscode.Uri.parse(projectViewAbsPath)
     }
     this.testItemFactory.createRootTestItem(projectViewUri)
@@ -292,7 +293,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     // Convert document contents into generic DocumentTestItem data.
     const testFileContents = await this.languageToolManager
       .getLanguageTools(parentTestInfo.target)
-      .getDocumentTestCases(parentTest.uri)
+      .getDocumentTestCases(parentTest.uri, this.repoRoot ?? '')
 
     // If document analysis has determined that it is not to be considered a test file, hide it.
     if (!testFileContents.isTestFile) {

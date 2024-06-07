@@ -29,6 +29,8 @@ export enum TestCaseStatus {
   Failed,
   Skipped,
   Errored,
+  // Defer to Test Explorer's automatic status determination based on outcome of an item's children.
+  Inherit,
 }
 
 export interface RunTrackerParams {
@@ -147,6 +149,8 @@ export class TestRunTracker implements TaskOriginHandlers {
         break
       case TestCaseStatus.Passed:
         this.run.passed(item)
+        break
+      case TestCaseStatus.Inherit:
         break
       case TestCaseStatus.Skipped:
       default:
@@ -401,7 +405,7 @@ function formatTestResultMessage(result) {
       message += `${ANSI_CODES.RED}[ERROR TYPE]${ANSI_CODES.RESET} ${testCaseData.errorType}\n\n`
     }
     if (testCaseData.fullError) {
-      message += `${ANSI_CODES.RED}[ERROR TYPE]${ANSI_CODES.RESET}\n\n${testCaseData.fullError}\n\n`
+      message += `${ANSI_CODES.RED}[FULL ERROR]${ANSI_CODES.RESET}\n\n${testCaseData.fullError}\n\n`
     }
   }
 

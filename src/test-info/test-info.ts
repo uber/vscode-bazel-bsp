@@ -133,16 +133,17 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
    * @param result TestResult returned by this run's request to the build server.
    */
   processTestRunResult(currentRun: TestRunTracker, result: TestResult): void {
+    // The executed test item inherits the overall run status.
     updateStatus(this.testItem, currentRun, result)
 
-    // All children that are still pending by this point inherit the overall run status.
+    // Remaining items, except those at a level that should execute independently, are marked to inherit the results from their children.
     for (const child of currentRun.pendingChildrenIterator(
       this.testItem,
       TestItemType.BazelTarget
     )) {
       // Only update children that are more specific than this item's type.
       // This will leave other targets in a pending state so they can run on their own.
-      updateStatus(child.testItem, currentRun, result)
+      currentRun.updateStatus(child.testItem, TestCaseStatus.Inherit)
     }
   }
 
@@ -219,20 +220,6 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
       this.testItem.label = this.details.name
     } else {
       this.testItem.label = path.basename(this.testItem.uri?.path ?? '')
-    }
-  }
-
-  /**
-   * Update the status of all pending children with the overall test run result.
-   * For items that are source files or more specific, all children should be updated so they do not run separately on their own.
-   * @param currentRun TestRunTracker for the current test run.
-   * @param result TestResult returned by this run's request to the build server.
-   */
-  processTestRunResult(currentRun: TestRunTracker, result: TestResult): void {
-    updateStatus(this.testItem, currentRun, result)
-
-    for (const child of currentRun.pendingChildrenIterator(this.testItem)) {
-      updateStatus(child.testItem, currentRun, result)
     }
   }
 

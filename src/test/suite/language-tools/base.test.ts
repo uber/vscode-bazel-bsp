@@ -27,7 +27,8 @@ suite('Base Language Tools', () => {
   test('process test cases', async () => {
     executeCommandStub.resolves(sampleDocumentSymbols)
     const result = await languageTools.getDocumentTestCases(
-      vscode.Uri.parse('file:///sample/my_test.py')
+      vscode.Uri.parse('file:///repo/root/sample/my_test.py'),
+      '/repo/root/'
     )
     assert.strictEqual(result.isTestFile, true)
     assert.strictEqual(result.testCases.length, 0)
