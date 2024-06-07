@@ -44,6 +44,7 @@ suite('Coverage Tracker', () => {
       include: [],
       exclude: [],
       profile: runProfile,
+      preserveFocus: false,
     })
     addCoverageStub = sandbox.stub(run, 'addCoverage')
 
