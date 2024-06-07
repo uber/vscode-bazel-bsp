@@ -111,7 +111,12 @@ suite('Test Runner', () => {
       requestedTestItems.push(item)
     })
     await runProfile.runHandler(
-      {include: requestedTestItems, exclude: [], profile: runProfile},
+      {
+        include: requestedTestItems,
+        exclude: [],
+        profile: runProfile,
+        preserveFocus: false,
+      },
       new vscode.CancellationTokenSource().token
     )
     assert.equal(connStub.callCount, 3)
@@ -136,7 +141,12 @@ suite('Test Runner', () => {
       requestedTestItems.push(item)
     })
     await runProfile.runHandler(
-      {include: requestedTestItems, exclude: [], profile: runProfile},
+      {
+        include: requestedTestItems,
+        exclude: [],
+        profile: runProfile,
+        preserveFocus: false,
+      },
       new vscode.CancellationTokenSource().token
     )
     assert.equal(connStub.callCount, 3)
@@ -165,7 +175,12 @@ suite('Test Runner', () => {
       requestedTestItems.push(item)
     })
     await runProfile.runHandler(
-      {include: requestedTestItems, exclude: [], profile: runProfile},
+      {
+        include: requestedTestItems,
+        exclude: [],
+        profile: runProfile,
+        preserveFocus: false,
+      },
       tokenSource.token
     )
     assert.equal(connStub.callCount, 1)
