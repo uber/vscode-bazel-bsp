@@ -149,6 +149,10 @@ suite('Python Language Tools', () => {
       result,
       'my.example.test_example.TestMyClass.test_method'
     )
+
+    testCaseInfo = new SourceFileTestCaseInfo(testInfo, sampleBuildTarget())
+    result = languageTools.mapTestCaseInfoToLookupKey(testCaseInfo)
+    assert.strictEqual(result, undefined)
   })
 })
 
