@@ -39,7 +39,7 @@ export class JavaLanguageTools implements LanguageTools {
     // Check whether a key is relevant to this TestCase, and return if applicable.
     if (testCaseInfo instanceof SourceFileTestCaseInfo) {
       const data = testCaseInfo.getDocumentTestItem()
-      return data.testFilter
+      return data?.testFilter
     }
 
     // For other test case types, e.g. those above an individual source file level, they won't be added to the lookup table.

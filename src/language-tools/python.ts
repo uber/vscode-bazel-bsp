@@ -40,7 +40,7 @@ export class PythonLanguageTools
     }
 
     const data = testCaseInfo.getDocumentTestItem()
-    return data.lookupKey
+    return data?.lookupKey
   }
 
   /**

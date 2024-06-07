@@ -192,7 +192,7 @@ export class SourceDirTestCaseInfo extends BuildTargetTestCaseInfo {
  */
 export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
   public readonly type: TestItemType
-  protected details: DocumentTestItem
+  protected details: DocumentTestItem | undefined
 
   constructor(test: vscode.TestItem, target: BuildTarget) {
     super(test, target)
@@ -203,7 +203,10 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
     if (this.target === undefined) return
 
     const params = super.prepareTestRunParams(currentRun)
-    if (params?.dataKind === TestParamsDataKind.BazelTest) {
+    if (
+      params?.dataKind === TestParamsDataKind.BazelTest &&
+      this.details?.testFilter
+    ) {
       const bazelParams = params.data as BazelTestParamsData
       bazelParams.testFilter = this.details.testFilter
     }
@@ -233,7 +236,7 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
     this.setDisplayName()
   }
 
-  getDocumentTestItem() {
+  getDocumentTestItem(): DocumentTestItem | undefined {
     return this.details
   }
 }
@@ -244,6 +247,7 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
  */
 export class TestItemTestCaseInfo extends SourceFileTestCaseInfo {
   public readonly type: TestItemType
+  protected details: DocumentTestItem
 
   constructor(
     test: vscode.TestItem,
@@ -253,23 +257,6 @@ export class TestItemTestCaseInfo extends SourceFileTestCaseInfo {
     super(test, target)
     this.type = TestItemType.TestCase
     this.details = details
-  }
-
-  /**
-   * Add test filters to the parameters prepared for this test case.
-   * @param currentRun TestRunTracker for the current test run.
-   * @returns TestParams to use in the Bazel BSP request, or undefined if the test case is not independently runnable.
-   */
-  prepareTestRunParams(currentRun: TestRunTracker): TestParams | undefined {
-    if (this.target === undefined) return
-
-    const params = super.prepareTestRunParams(currentRun)
-    if (params?.dataKind === TestParamsDataKind.BazelTest) {
-      const bazelParams = params.data as BazelTestParamsData
-      bazelParams.testFilter = this.details.testFilter
-    }
-
-    return params
   }
 
   /**

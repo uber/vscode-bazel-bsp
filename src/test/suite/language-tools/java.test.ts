@@ -133,5 +133,9 @@ suite('Java Language Tools', () => {
 
     result = languageTools.mapTestCaseInfoToLookupKey(testCaseInfo)
     assert.strictEqual(result, 'com.example.ClassName.myTest')
+
+    testCaseInfo = new SourceFileTestCaseInfo(testInfo, sampleBuildTarget())
+    result = languageTools.mapTestCaseInfoToLookupKey(testCaseInfo)
+    assert.strictEqual(result, undefined)
   })
 })
