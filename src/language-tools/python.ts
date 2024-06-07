@@ -5,6 +5,7 @@ import {DocumentTestItem, LanguageTools, TestFileContents} from './manager'
 import {TestFinish} from '../bsp/bsp'
 import {SourceFileTestCaseInfo, TestCaseInfo} from '../test-info/test-info'
 import {BaseLanguageTools} from './base'
+import {JUnitStyleTestCaseData, TestFinishDataKind} from '../bsp/bsp-ext'
 
 const TEST_FILE_REGEX = /^(test_.+\.py|.+_test\.py)$/
 
@@ -13,11 +14,44 @@ export class PythonLanguageTools
   implements LanguageTools
 {
   /**
+   * Maps testFinishData into a unique identifier for each test case.
+   * For Python, this will consist of the fully qualified path to the test case:
+   *   path.to.test_example.TestMyClass.test_method or  path.to.test_example.test_method
+   * @param testFinishData individual TestFinish data reported by build server.
+   * @returns Lookup key to find this test case in the TestRunTracker.
+   */
+  mapTestFinishDataToLookupKey(testFinishData: TestFinish): string | undefined {
+    if (testFinishData.dataKind === TestFinishDataKind.JUnitStyleTestCaseData) {
+      const testCaseData = testFinishData.data as JUnitStyleTestCaseData
+      return `${testCaseData.className}.${testFinishData.displayName}`
+    }
+    return undefined
+  }
+
+  /**
+   * Maps a TestCaseValue into a standard lookup key in the TestRunTracker.
+   * For Python, this differs in format from the test filter, as it includes the full path to the test case.
+   * @param testCaseInfo Test case information to be converted into a lookup key.
+   * @returns Lookup key which will be used to identify this test case in the TestRunTracker.
+   */
+  mapTestCaseInfoToLookupKey(testCaseInfo: TestCaseInfo): string | undefined {
+    if (!(testCaseInfo instanceof SourceFileTestCaseInfo)) {
+      return undefined
+    }
+
+    const data = testCaseInfo.getDocumentTestItem()
+    return data.lookupKey
+  }
+
+  /**
    * Identification of Python test cases.
    * @param document URI of the document to be analyzed for test cases.
    * @returns Result indicating whether this should be considered a test file, and the analyzed test case contents.
    */
-  async getDocumentTestCases(document: vscode.Uri): Promise<TestFileContents> {
+  async getDocumentTestCases(
+    document: vscode.Uri,
+    workspaceRoot: string
+  ): Promise<TestFileContents> {
     if (!TEST_FILE_REGEX.test(path.basename(document.fsPath))) {
       // Exclude files that do not match Python convention of *_test.py or test_*.py
       return {
@@ -25,6 +59,17 @@ export class PythonLanguageTools
         testCases: [],
       }
     }
+
+    // Generate a prefix to be used for the lookup key.
+    // Converts file path, after the repo root, to a Python module path.
+    // Example: /path/to/repo/src/test/test_example.py -> src.test.test_example
+    let fileInfo = path.parse(path.relative(workspaceRoot, document.fsPath))
+    const lookupKeyBase = `${fileInfo.dir.replaceAll('/', '.')}.${
+      fileInfo.name
+    }`
+
+    // File name to be included in test filter
+    const testFilterBase = fileInfo.name
 
     const fullDocTestItem: DocumentTestItem = {
       name: path.basename(document.fsPath),
@@ -55,8 +100,9 @@ export class PythonLanguageTools
             name: symbol.name,
             range: symbol.range,
             uri: document,
-            testFilter: symbol.name,
+            testFilter: `${testFilterBase} and ${symbol.name}`,
             parent: parent,
+            lookupKey: `${lookupKeyBase}.${symbol.name}`,
           }
         } else {
           // Per Python test discovery convention, don't evaluate non-test classes.
@@ -68,12 +114,21 @@ export class PythonLanguageTools
           symbol.kind === vscode.SymbolKind.Function) &&
         symbol.name.startsWith('test')
       ) {
+        const testFilter = parent
+          ? `${parent.testFilter} and ${symbol.name}`
+          : `${testFilterBase} and ${symbol.name}`
+
+        const lookupKey = parent?.lookupKey
+          ? `${parent.lookupKey}.${symbol.name}`
+          : `${lookupKeyBase}.${symbol.name}`
+
         newItem = {
           name: symbol.name,
           range: symbol.range,
           uri: document,
-          testFilter: symbol.name,
+          testFilter: testFilter,
           parent: parent,
+          lookupKey: lookupKey,
         }
       }
       if (newItem) {

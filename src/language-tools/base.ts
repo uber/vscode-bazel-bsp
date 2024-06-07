@@ -30,7 +30,10 @@ export class BaseLanguageTools implements LanguageTools {
    * @param document URI of the document to be analyzed for test cases.
    * @returns Result always contains isTestFile value of true, and no test cases.
    */
-  async getDocumentTestCases(document: vscode.Uri): Promise<TestFileContents> {
+  async getDocumentTestCases(
+    document: vscode.Uri,
+    workspaceRoot: string
+  ): Promise<TestFileContents> {
     return {
       // Do not filter out any files.
       isTestFile: true,
