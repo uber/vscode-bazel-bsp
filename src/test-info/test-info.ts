@@ -273,20 +273,15 @@ function updateStatus(
   currentRun: TestRunTracker,
   result: TestResult
 ) {
-  switch (result.statusCode) {
-    case StatusCode.Ok:
-      currentRun.updateStatus(item, TestCaseStatus.Passed)
-      break
-    case StatusCode.Error:
-      currentRun.updateStatus(
-        item,
-        TestCaseStatus.Failed,
-        // TODO(IDE-979): Test message processing and overlay.
-        new vscode.TestMessage(JSON.stringify(result.data))
-      )
-      break
-    case StatusCode.Cancelled:
-      currentRun.updateStatus(item, TestCaseStatus.Skipped)
-      break
+  if (result.statusCode === StatusCode.Error) {
+    const stdOut = result.data?.stdoutCollector?.lines
+    const testMessage = stdOut
+      ? new vscode.TestMessage(stdOut.join('\n'))
+      : undefined
+    currentRun.updateStatus(item, TestCaseStatus.Failed, testMessage)
+  } else if (result.statusCode === StatusCode.Ok) {
+    currentRun.updateStatus(item, TestCaseStatus.Passed)
+  } else {
+    currentRun.updateStatus(item, TestCaseStatus.Skipped)
   }
 }

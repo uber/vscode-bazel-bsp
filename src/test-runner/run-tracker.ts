@@ -12,6 +12,7 @@ import {
 } from '../bsp/bsp'
 import {TaskOriginHandlers} from '../test-explorer/client'
 import {
+  JUnitStyleTestCaseData,
   PublishOutputDataKind,
   PublishOutputParams,
   TestCoverageReport,
@@ -388,26 +389,29 @@ export class TestRunTracker implements TaskOriginHandlers {
         this.updateStatus(
           item.testItem,
           TestCaseStatus.Failed,
-          new vscode.TestMessage(formatTestResultMessage(testFinishData))
+          formatTestResultMessage(testFinishData)
         )
     }
   }
 }
 
-function formatTestResultMessage(result) {
-  let message = result.message
-    ? `${ANSI_CODES.CYAN}${ANSI_CODES.BOLD}${result.message}${ANSI_CODES.RESET}\n\n`
-    : ''
+function formatTestResultMessage(result): vscode.TestMessage | undefined {
+  let message =
+    // Ignore 'null' string as well.
+    // TODO(IDE-1133): Ensure server does not convert null values to string.
+    result.message !== undefined && result.message !== 'null'
+      ? `${ANSI_CODES.CYAN}${ANSI_CODES.BOLD}${result.message}${ANSI_CODES.RESET}\n\n`
+      : ''
 
   if (result.dataKind === TestFinishDataKind.JUnitStyleTestCaseData) {
-    const testCaseData = result.data
-    if (testCaseData.errorType) {
+    const testCaseData = result.data as JUnitStyleTestCaseData
+    if (testCaseData.errorType && testCaseData.fullError !== 'null') {
       message += `${ANSI_CODES.RED}[ERROR TYPE]${ANSI_CODES.RESET} ${testCaseData.errorType}\n\n`
     }
-    if (testCaseData.fullError) {
+    if (testCaseData.fullError && testCaseData.fullError !== 'null') {
       message += `${ANSI_CODES.RED}[FULL ERROR]${ANSI_CODES.RESET}\n\n${testCaseData.fullError}\n\n`
     }
   }
 
-  return message
+  return new vscode.TestMessage(message)
 }

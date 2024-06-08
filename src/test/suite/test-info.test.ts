@@ -319,13 +319,21 @@ suite('TestInfo', () => {
       const bspResult: TestResult = {
         statusCode: StatusCode.Error,
         originId: 'sample',
-        data: {message: 'test error details'},
+        data: {
+          stdoutCollector: {
+            lines: ['hello', 'world'],
+          },
+        },
       }
       testInfo.processTestRunResult(currentRun, bspResult)
       assert.equal(currentRun.updateStatus.getCall(0).args[0], testItem)
       assert.equal(
         currentRun.updateStatus.getCall(0).args[1],
         TestCaseStatus.Failed
+      )
+      assert.equal(
+        currentRun.updateStatus.getCall(0).args[2]?.message,
+        'hello\nworld'
       )
     })
 
