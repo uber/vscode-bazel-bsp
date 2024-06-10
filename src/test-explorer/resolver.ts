@@ -311,6 +311,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
 
     // Convert the returned test cases into TestItems and add to the tree.
     const newItems = new Map<DocumentTestItem, vscode.TestItem>()
+    const directChildren: vscode.TestItem[] = []
     for (const testCase of testFileContents.testCases ?? []) {
       const newTest = this.testItemFactory.createTestCaseTestItem(
         testCase,
@@ -320,8 +321,9 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
 
       // Maintain the same parent-child relationship as the returned test case data.
       if (testCase.parent) newItems.get(testCase.parent)?.children.add(newTest)
-      else parentTest.children.add(newTest)
+      else directChildren.push(newTest)
     }
+    parentTest.children.replace(directChildren)
 
     // Update the parent test with required information for full-file run.
     if (testFileContents.documentTest)
