@@ -475,6 +475,10 @@ suite('Test Resolver', () => {
         assert.equal(child.children.size, 1)
       })
       assert.equal(sourceFileTestItem.label, 'My Document')
+
+      testCases[0].name = 'test_case_1_renamed'
+      await testCaseStore.testController.resolveHandler(sourceFileTestItem)
+      assert.equal(sourceFileTestItem.children.size, 2)
     })
 
     test('refresh success', async () => {
