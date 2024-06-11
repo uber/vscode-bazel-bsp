@@ -2,7 +2,7 @@
 
 This extension is designed to provide integration between VS Code and Bazel BSP.  It is inspired by the [New Bazel Plugin](https://lp.jetbrains.com/new-bazel-plugin/) for JetBrains products, allowing VS Code to leverage a subset of Bazel BSP as well.
 
-- [Build Server Protocol](https://code.visualstudio.com/api/extension-guides/testing)
+- [Build Server Protocol](https://build-server-protocol.github.io/)
 - [Bazel BSP](https://github.com/JetBrains/bazel-bsp)
 
 The initial focus will be to build out several core workflows for to integrate Bazel BSP with VS Code's [Test Explorer](https://code.visualstudio.com/api/extension-guides/testing), including the following:
