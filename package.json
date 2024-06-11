@@ -1,6 +1,6 @@
 {
   "name": "vscode-bazel-bsp",
-  "displayName": "vscode-bazel-bsp",
+  "displayName": "Bazel Build Server Protocol (BSP)",
   "description": "Bazel BSP integration for VS Code.",
   "version": "0.0.1",
   "license": "Apache-2.0",
@@ -9,7 +9,7 @@
     "vscode": "^1.89.0"
   },
   "categories": [
-    "Other"
+    "Testing"
   ],
   "activationEvents": [
     "workspaceContains:**/*.{java,scala,py,kt}"
@@ -47,7 +47,7 @@
         },
         "bazelbsp.serverVersion": {
           "type": "string",
-          "default": "3.2.0",
+          "default": "3.2.0-20240606-167e699-NIGHTLY",
           "description": "Version of the Bazel BSP server to install."
         },
         "bazelbsp.bazelBinaryPath": {

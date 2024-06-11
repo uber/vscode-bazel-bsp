@@ -1,7 +1,18 @@
 # Change Log
 
-All notable changes to the "vscode-bazel-bsp" extension will be documented in this file.
+Key notable changes are outlined below.
 
-## [Unreleased]
+## [0.0.2] 2024-06-10
 
-- Extension is currently in an initial iteration phase, focused on getting core test execution functionality working. Updates will be added here once we begin tracking formal releases.
+### Added
+- Release for initial end user testing and feedback
+- Includes core functionality for the following:
+  - BSP server install
+  - BSP server launch and initialization
+  - Project sync via BSP
+  - Test target discovery and integration with Test Explorer
+  - Test case discovery for Java + Python
+  - Test execution with and without coverage
+  - Test filtering based on discovered test cases
+  - Parsing of LCOV results and display of coverage highlighting
+  - Test result output and overlay
