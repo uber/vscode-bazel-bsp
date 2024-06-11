@@ -45,6 +45,3 @@ The extension is still under development - once it is end-user ready, we will of
 
 ## Known Issues
 - Coming soon
-
-## Release Notes
-- Coming soon
