@@ -15,7 +15,8 @@
 		"baseUrl": ".",
 		"noImplicitAny": false,
 		"useUnknownInCatchVariables": false,
-		"strictPropertyInitialization": false
+		"strictPropertyInitialization": false,
+		"moduleResolution": "NodeNext"
 	},
 	"exclude": [
 		"node_modules",
