@@ -22,3 +22,4 @@ jobs:
         cache: 'yarn'
     - run: yarn install
     - run: yarn test:ci
+    - run: yarn package

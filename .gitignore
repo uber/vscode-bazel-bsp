@@ -4,3 +4,5 @@ build
 .vscode-test
 dist
 .DS_Store
+.bazelbsp
+.bsp
