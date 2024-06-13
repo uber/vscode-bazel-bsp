@@ -2,7 +2,8 @@
   "name": "vscode-bazel-bsp",
   "displayName": "Bazel Build Server Protocol (BSP)",
   "description": "Bazel BSP integration for VS Code.",
-  "version": "0.0.1",
+  "publisher": "Uber",
+  "version": "0.0.3",
   "license": "Apache-2.0",
   "repository": "https://github.com/uber/vscode-bazel-bsp",
   "engines": {
