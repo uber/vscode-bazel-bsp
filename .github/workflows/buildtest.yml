@@ -22,3 +22,18 @@ jobs:
         cache: 'yarn'
     - run: yarn install
     - run: yarn test:ci
+    - name: Package the extension
+      id: package
+      run: |
+        yarn package
+        PACKAGE_PATH=$(find . -name 'vscode-bazel-bsp-*.vsix')
+        PACKAGE_NAME_WITH_SHA="${PACKAGE_PATH%.vsix}-$(echo $GITHUB_SHA | cut -c1-7).vsix"
+        echo "package_path=$PACKAGE_PATH" >> $GITHUB_ENV
+        echo "package_name_with_sha=$(basename $PACKAGE_NAME_WITH_SHA)" >> $GITHUB_ENV
+    - name: Upload packaged extension artifact
+      # Artifact is only uploaded on push to main, to preserve artifact storage capacity.
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.package_name_with_sha }}
+        path: ${{ env.package_path }}

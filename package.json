@@ -97,21 +97,22 @@
     "@vscode/test-cli": "^0.0.6",
     "@vscode/test-electron": "^2.3.9",
     "eslint": "^8.56.0",
-    "typescript": "4.9",
-    "eslint-plugin-node":"^11.1.0",
+    "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-prettier": "^5.0.0",
     "gts": "^5.2.0",
-    "sinon": "^15.1.0"
+    "sinon": "^15.1.0",
+    "typescript": "4.9",
+    "vsce": "^2.15.0"
   },
   "dependencies": {
     "@friedemannsommer/lcov-parser": "^3.1.1",
     "@nestjs/common": "^10.3.3",
     "@nestjs/core": "^10.3.3",
     "@nestjs/testing": "^10.3.3",
+    "axios": "1.6.8",
     "esbuild": "^0.20.2",
     "reflect-metadata": "^0.2.1",
     "semver": "^7.6.0",
-    "vscode-jsonrpc": "^8.2.0",
-    "axios": "1.6.8"
+    "vscode-jsonrpc": "^8.2.0"
   }
 }
