@@ -1,4 +1,4 @@
-# VS Code Bazel Build Server Protcol (BSP) Extension
+# Bazel Build Server Protcol (BSP) VS Code Extension
 
 This extension is designed to provide integration between VS Code and Bazel BSP.  It is inspired by the [New Bazel Plugin](https://lp.jetbrains.com/new-bazel-plugin/) for JetBrains products, allowing VS Code to leverage a subset of Bazel BSP as well.
 
