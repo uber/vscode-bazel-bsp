@@ -34,7 +34,7 @@ suite('Java Language Tools', () => {
     testController.dispose()
   })
 
-  test('process test cases', async () => {
+  test('process test cases, example 1', async () => {
     const result = await languageTools.getDocumentTestCases(
       vscode.Uri.file(
         path.join(fixtureDir, 'language_files', 'SampleValidExampleTest.java')
@@ -55,6 +55,29 @@ suite('Java Language Tools', () => {
     }
     assert.equal(result.documentTest?.testFilter, expectedBaseTestFilter)
     assert.equal(result.documentTest?.name, 'SampleValidExampleTest')
+  })
+
+  test('process test cases, example 2', async () => {
+    const result = await languageTools.getDocumentTestCases(
+      vscode.Uri.file(
+        path.join(fixtureDir, 'language_files', 'TestSampleValidExample.java')
+      )
+    )
+
+    assert.strictEqual(result.isTestFile, true)
+    assert.strictEqual(result.testCases.length, 2)
+
+    const expectedBaseTestFilter =
+      'com.sample.project.common.client.samplepackage.TestSampleValidExample'
+
+    const expectedTests = ['testGetInstance', 'testGetSampleClient']
+    for (const test of result.testCases) {
+      assert.ok(expectedTests.includes(test.name))
+      assert.ok(test.testFilter.startsWith(expectedBaseTestFilter))
+      assert.ok(test.testFilter.endsWith(test.name))
+    }
+    assert.equal(result.documentTest?.testFilter, expectedBaseTestFilter)
+    assert.equal(result.documentTest?.name, 'TestSampleValidExample')
   })
 
   test('no matching test class name', async () => {

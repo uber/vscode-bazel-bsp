@@ -268,7 +268,14 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     this.condenseTestItems(parentTest)
 
     // Kick off test case resolution within each of the target's documents.
+    let counter = 1
     for (const doc of allDocumentTestItems) {
+      updateDescription(
+        parentTest,
+        `Loading: analyzing test cases in file ${counter++} of ${
+          allDocumentTestItems.length
+        }`
+      )
       await this.resolveDocumentTestCases(doc, cancellationToken)
 
       if (doc.uri) {
@@ -280,6 +287,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
         this.store.updateTestItemWatcher(doc.id, watcher)
       }
     }
+    updateDescription(parentTest)
   }
 
   private async resolveDocumentTestCases(

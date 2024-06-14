@@ -8,7 +8,7 @@ import {SourceFileTestCaseInfo, TestCaseInfo} from '../test-info/test-info'
 
 const TEST_FILE_REGEX = /^(Test.+\.java|.+Test\.java)$/
 const JAVA_TEST_REGEX =
-  /@Test\s+.*\s+public void (?<methodName>\w+)|public class (?<className>\w+Test)\s+extends/
+  /@Test\s+.*\s+public void (?<methodName>\w+)|public class (?<className>(Test\w*|\w+Test))\s+extends/
 const PACKAGE_NAME_REGEX =
   /package\s+(?<packageName>([a-zA-Z_][a-zA-Z0-9_]*)(\.[a-zA-Z_][a-zA-Z0-9_]*)*);/
 
@@ -80,8 +80,9 @@ export class JavaLanguageTools implements LanguageTools {
     uri: vscode.Uri
   ): Promise<TestFileContents> {
     // Get document text.
-    const textDocument = await vscode.workspace.openTextDocument(uri)
-    const text = textDocument.getText()
+    const fileContents = await vscode.workspace.fs.readFile(uri)
+    const text = fileContents.toString()
+    const lines = text.split('\n')
 
     const testCases: DocumentTestItem[] = []
     let classTestCase: DocumentTestItem | undefined
@@ -92,8 +93,16 @@ export class JavaLanguageTools implements LanguageTools {
 
     let match
     const regex = new RegExp(JAVA_TEST_REGEX, 'g')
+
+    let lineStartIndex = 0
+    let currentLine = 0
     while ((match = regex.exec(text)) !== null) {
-      const position = textDocument.positionAt(match.index)
+      // Advance the current line each time there is a match.
+      while (lineStartIndex + lines[currentLine].length < match.index) {
+        lineStartIndex += lines[currentLine].length + 1 // +1 for the newline character.
+        currentLine++
+      }
+      const position = new vscode.Position(currentLine, 0)
 
       // Each match will contain either the full Class, or an individual test method.
       if (match.groups.className) {
