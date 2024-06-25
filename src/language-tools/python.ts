@@ -8,6 +8,7 @@ import {BaseLanguageTools} from './base'
 import {JUnitStyleTestCaseData, TestFinishDataKind} from '../bsp/bsp-ext'
 
 const TEST_FILE_REGEX = /^(test_.+\.py|.+_test\.py)$/
+const PARAMETERIZED_TEST_REGEX = /^(?<lookupKey>.*)\[(?<subTestName>.*)\]$/
 
 export class PythonLanguageTools
   extends BaseLanguageTools
@@ -23,7 +24,15 @@ export class PythonLanguageTools
   mapTestFinishDataToLookupKey(testFinishData: TestFinish): string | undefined {
     if (testFinishData.dataKind === TestFinishDataKind.JUnitStyleTestCaseData) {
       const testCaseData = testFinishData.data as JUnitStyleTestCaseData
-      return `${testCaseData.className}.${testFinishData.displayName}`
+      let testCaseName = testFinishData.displayName
+
+      // In case of a parameterized test, keep the method name.
+      const match = testCaseName.match(PARAMETERIZED_TEST_REGEX)
+      if (match?.groups?.lookupKey) {
+        testCaseName = match.groups.lookupKey
+      }
+
+      return `${testCaseData.className}.${testCaseName}`
     }
     return undefined
   }

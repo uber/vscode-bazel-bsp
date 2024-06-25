@@ -11,6 +11,7 @@ const JAVA_TEST_REGEX =
   /@Test\s+.*\s+public void (?<methodName>\w+)|public class (?<className>(Test\w*|\w+Test))\s+extends/
 const PACKAGE_NAME_REGEX =
   /package\s+(?<packageName>([a-zA-Z_][a-zA-Z0-9_]*)(\.[a-zA-Z_][a-zA-Z0-9_]*)*);/
+const PARAMETERIZED_TEST_REGEX = /^(?<lookupKey>.*)\[(?<subTestName>.*)\]$/
 
 export class JavaLanguageTools implements LanguageTools {
   /**
@@ -22,7 +23,15 @@ export class JavaLanguageTools implements LanguageTools {
     if (testFinishData.dataKind === TestFinishDataKind.JUnitStyleTestCaseData) {
       const testCaseData = testFinishData.data as JUnitStyleTestCaseData
       if (testCaseData.className !== undefined) {
-        return `${testCaseData.className}.${testFinishData.displayName}`
+        let testCaseName = testFinishData.displayName
+
+        // In case of a parameterized test, keep the method name.
+        const match = testCaseName.match(PARAMETERIZED_TEST_REGEX)
+        if (match?.groups?.lookupKey) {
+          testCaseName = match.groups.lookupKey
+        }
+
+        return `${testCaseData.className}.${testCaseName}`
       } else {
         return testFinishData.displayName
       }

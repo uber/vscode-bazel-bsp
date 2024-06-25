@@ -258,6 +258,38 @@ suite('Test Run Tracker', () => {
     assert.equal(runSpy.failed.getCall(0).args[1], message)
   })
 
+  test('multiple updates', async () => {
+    const testItem = createdTestItems[0]
+    const message: vscode.TestMessage = {
+      message: 'Test failed due to assertion error',
+      location: new vscode.Location(
+        vscode.Uri.file('/path/to/file'),
+        new vscode.Range(1, 1, 1, 10)
+      ),
+    }
+    await testRunner.updateStatus(testItem, TestCaseStatus.Failed, message)
+    assert.equal(runSpy.failed.callCount, 1)
+    assert.equal(runSpy.failed.getCall(0).args[0], testItem)
+    assert.equal(runSpy.failed.getCall(0).args[1], message)
+
+    // Calls with a lower rank status should not update the status.
+    await testRunner.updateStatus(testItem, TestCaseStatus.Passed, message)
+    assert.equal(runSpy.passed.callCount, 0)
+    assert.equal(runSpy.enqueued.callCount, 0)
+    assert.equal(runSpy.failed.callCount, 1)
+
+    await testRunner.updateStatus(testItem, TestCaseStatus.Pending, message)
+    assert.equal(runSpy.passed.callCount, 0)
+    assert.equal(runSpy.enqueued.callCount, 0)
+    assert.equal(runSpy.failed.callCount, 1)
+
+    // Additional failures should update the status.
+    await testRunner.updateStatus(testItem, TestCaseStatus.Failed, message)
+    assert.equal(runSpy.failed.callCount, 2)
+    assert.equal(runSpy.failed.getCall(0).args[0], testItem)
+    assert.equal(runSpy.failed.getCall(0).args[1], message)
+  })
+
   test('skip test item', async () => {
     const testItem = createdTestItems[0]
     await testRunner.updateStatus(testItem, TestCaseStatus.Skipped)

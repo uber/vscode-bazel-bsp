@@ -126,6 +126,17 @@ suite('Java Language Tools', () => {
       status: TestStatus.Failed,
     })
     assert.strictEqual(result, undefined)
+
+    result = languageTools.mapTestFinishDataToLookupKey({
+      displayName: 'myTest[example1]',
+      status: TestStatus.Failed,
+      dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+      data: {
+        time: 0,
+        className: 'com.example.ClassName',
+      },
+    })
+    assert.strictEqual(result, 'com.example.ClassName.myTest')
   })
 
   test('map test case info to lookup key', async () => {

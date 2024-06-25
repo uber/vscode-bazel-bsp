@@ -115,6 +115,17 @@ suite('Python Language Tools', () => {
     assert.strictEqual(result, 'my.example.test_example.test_method')
 
     result = languageTools.mapTestFinishDataToLookupKey({
+      displayName: 'test_method[example1]',
+      status: TestStatus.Failed,
+      dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+      data: {
+        time: 0,
+        className: 'my.example.test_example',
+      },
+    })
+    assert.strictEqual(result, 'my.example.test_example.test_method')
+
+    result = languageTools.mapTestFinishDataToLookupKey({
       displayName: 'pytest',
       status: TestStatus.Failed,
     })
