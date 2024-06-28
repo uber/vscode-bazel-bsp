@@ -36,6 +36,7 @@ export class TestItemFactory {
       'Bazel Test Targets',
       uri
     )
+    newTest.range = new vscode.Range(0, 0, 0, 0)
     newTest.canResolveChildren = true
     this.store.testCaseMetadata.set(
       newTest,

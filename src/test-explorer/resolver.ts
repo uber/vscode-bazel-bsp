@@ -149,6 +149,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       parentTest,
       'Loading: waiting for build server connection'
     )
+    parentTest.error = undefined
     const conn = await this.buildServer.getConnection()
 
     updateDescription(parentTest, 'Loading: fetching available targets')
@@ -201,6 +202,25 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       )
       relevantParent.children.add(newTest)
     })
+
+    // If no test items were added, show the getting started message as a test message overlaid on the .bazelproject file.
+    // This provides an opportunity for the user to make adjustments and re-sync.
+    if (parentTest.children.size === 0) {
+      // Dummy test run that overlays the getting started message on the .bazelproject file.
+      const run = this.store.testController.createTestRun(
+        new vscode.TestRunRequest()
+      )
+      run.errored(parentTest, new vscode.TestMessage(gettingStartedMessage))
+      run.end()
+
+      // Link in the test explorer tree to set up the project.
+      const encodedFileUri = encodeURIComponent(JSON.stringify(parentTest.uri))
+      const syncFailMessage = new vscode.MarkdownString(
+        `No test targets found. [Setup your project](command:vscode.open?${encodedFileUri})`
+      )
+      syncFailMessage.isTrusted = true
+      parentTest.error = syncFailMessage
+    }
 
     // Replace all children with the newly returned test cases.
     this.condenseTestItems(parentTest)
@@ -403,3 +423,19 @@ function combineCancelTokens(
   token2?.onCancellationRequested(() => combinedSource.cancel())
   return combinedSource.token
 }
+
+const gettingStartedMessage = new vscode.MarkdownString(
+  `To use the Test Explorer, please configure your project.
+
+  Getting started tips:
+  - Update this file with some paths that include test targets.
+    - Use the directories key to specify by directory
+    - Use the targets key to specify by Bazel target pattern
+  - Ensure that the bazel_binary field in this file matches the path to your Bazel binary.
+  - Re-sync at any time by clicking the $(extensions-refresh) refresh icon at the very top of the testing panel.
+
+  Does it seem like something else went wrong? Check for output [here](command:bazelbsp.showServerOutput).
+  `,
+  true
+)
+gettingStartedMessage.isTrusted = true
