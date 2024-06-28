@@ -48,7 +48,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: 'Syncing Bazel Test Targets',
+        title: 'Refreshing Test Cases',
         cancellable: true,
       },
       async (
@@ -93,12 +93,22 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
 
         switch (parentMetadata?.type) {
           case TestItemType.Root:
+            progress.report({
+              message:
+                'Fetching test targets from build server ([progress](command:bazelbsp.showServerOutput))',
+            })
             await this.resolveTargets(parentTest, combinedToken)
             break
           case TestItemType.BazelTarget:
+            progress.report({
+              message: `Fetching source files in ${parentMetadata.target?.displayName}`,
+            })
             await this.resolveSourceFiles(parentTest, combinedToken)
             break
           case TestItemType.SourceFile:
+            progress.report({
+              message: `Finding test cases in ${parentMetadata.testItem.label}`,
+            })
             await this.resolveDocumentTestCases(parentTest, combinedToken)
         }
       }
