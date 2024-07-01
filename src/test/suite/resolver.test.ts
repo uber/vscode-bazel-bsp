@@ -344,6 +344,30 @@ suite('Test Resolver', () => {
       }
     })
 
+    test('no targets returned', async () => {
+      const root = testCaseStore.testController.createTestItem(
+        'root',
+        'Bazel Test Targets'
+      )
+      testCaseStore.testController.items.add(root)
+      testCaseStore.testCaseMetadata.set(
+        root,
+        new TestCaseInfo(root, undefined, TestItemType.Root)
+      )
+      assert.ok(testCaseStore.testController.resolveHandler)
+
+      // Simulate an empty result from requesting targets.
+      const emptyResult: bsp.WorkspaceBuildTargetsResult = {
+        targets: [],
+      }
+      const sendRequestStub = sandbox
+        .stub(sampleConn, 'sendRequest')
+        .resolves(emptyResult)
+      await testCaseStore.testController.resolveHandler(root)
+      const message = root.error as vscode.MarkdownString
+      assert.ok(message.value.includes('No test targets found'))
+    })
+
     test('source files within a target', async () => {
       const buildTarget = sampleBuildTargetsResult.targets[0]
       const sendRequestStub = sandbox
