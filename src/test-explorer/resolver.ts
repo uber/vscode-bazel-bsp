@@ -434,7 +434,7 @@ const gettingStartedMessage = new vscode.MarkdownString(
   - Ensure that the bazel_binary field in this file matches the path to your Bazel binary.
   - Re-sync at any time by clicking the $(extensions-refresh) refresh icon at the very top of the testing panel.
 
-  Does it seem like something else went wrong? Check for output [here](command:bazelbsp.showServerOutput).
+  Think something else went wrong? Check the output [here](command:bazelbsp.showServerOutput).
   `,
   true
 )
