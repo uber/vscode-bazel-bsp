@@ -36,7 +36,7 @@ suite('Python Language Tools', () => {
       '/repo/root/'
     )
     assert.strictEqual(result.isTestFile, true)
-    assert.strictEqual(result.testCases.length, 5)
+    assert.strictEqual(result.testCases.length, 7)
 
     const expectedTests: Map<string, string[]> = new Map()
     expectedTests.set('TestExample', [
@@ -58,6 +58,14 @@ suite('Python Language Tools', () => {
     expectedTests.set('test_separate_function', [
       'sample.my_test.test_separate_function',
       'my_test and test_separate_function',
+    ])
+    expectedTests.set('ExampleTest', [
+      'sample.my_test.ExampleTest',
+      'my_test and ExampleTest',
+    ])
+    expectedTests.set('test_example_2', [
+      'sample.my_test.ExampleTest.test_example_2',
+      'my_test and ExampleTest and test_example_2',
     ])
 
     for (const test of result.testCases) {
@@ -256,5 +264,49 @@ const sampleDocumentSymbols: vscode.DocumentSymbol[] = [
       new vscode.Position(10, 16)
     ),
     children: [],
+  },
+  {
+    // Class name that matches but contains no methods.
+    name: 'TestExampleEmpty',
+    detail: '',
+    kind: vscode.SymbolKind.Class,
+    range: new vscode.Range(
+      new vscode.Position(8, 0),
+      new vscode.Position(35, 44)
+    ),
+    selectionRange: new vscode.Range(
+      new vscode.Position(8, 6),
+      new vscode.Position(8, 25)
+    ),
+    children: [],
+  },
+  {
+    name: 'ExampleTest',
+    detail: '',
+    kind: vscode.SymbolKind.Class,
+    range: new vscode.Range(
+      new vscode.Position(8, 0),
+      new vscode.Position(35, 44)
+    ),
+    selectionRange: new vscode.Range(
+      new vscode.Position(8, 6),
+      new vscode.Position(8, 25)
+    ),
+    children: [
+      {
+        name: 'test_example_2',
+        detail: '',
+        kind: vscode.SymbolKind.Method,
+        range: new vscode.Range(
+          new vscode.Position(10, 4),
+          new vscode.Position(12, 5)
+        ),
+        selectionRange: new vscode.Range(
+          new vscode.Position(10, 4),
+          new vscode.Position(10, 16)
+        ),
+        children: [],
+      },
+    ],
   },
 ]
