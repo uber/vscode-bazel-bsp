@@ -88,13 +88,14 @@ export class PythonLanguageTools
         document
       )
     const result: DocumentTestItem[] = []
+    const shouldInclude = new Set<DocumentTestItem>()
     const evaluateCurrentSymbol = (
       symbol: vscode.DocumentSymbol,
       parent: DocumentTestItem | undefined = undefined
     ) => {
       let newItem: DocumentTestItem | undefined
       if (symbol.kind === vscode.SymbolKind.Class) {
-        if (symbol.name.startsWith('Test')) {
+        if (symbol.name.startsWith('Test') || symbol.name.endsWith('Test')) {
           // Capture class names that begin with 'Test'
           newItem = {
             name: symbol.name,
@@ -124,12 +125,15 @@ export class PythonLanguageTools
 
         newItem = {
           name: symbol.name,
-          range: symbol.range,
+          range: symbol.selectionRange,
           uri: document,
           testFilter: testFilter,
           parent: parent,
           lookupKey: lookupKey,
         }
+
+        if (parent) shouldInclude.add(parent)
+        shouldInclude.add(newItem)
       }
       if (newItem) {
         result.push(newItem)
@@ -146,9 +150,13 @@ export class PythonLanguageTools
       evaluateCurrentSymbol(symbol)
     }
 
+    const finalTestCases = result.filter(item => {
+      return shouldInclude.has(item)
+    })
+
     return {
       isTestFile: true,
-      testCases: result,
+      testCases: finalTestCases,
       documentTest: fullDocTestItem,
     }
   }
