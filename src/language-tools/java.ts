@@ -11,6 +11,7 @@ const JAVA_TEST_REGEX =
   /@Test\s+.*\s+public void (?<methodName>\w+)|public class (?<className>(Test\w*|\w+Test))\s+extends/
 const PACKAGE_NAME_REGEX =
   /package\s+(?<packageName>([a-zA-Z_][a-zA-Z0-9_]*)(\.[a-zA-Z_][a-zA-Z0-9_]*)*);/
+const PARAMETERIZED_TEST_REGEX = /^(?<lookupKey>.*?)(?=\[.*?\])(.*)$/
 
 export class JavaLanguageTools implements LanguageTools {
   /**
@@ -19,10 +20,24 @@ export class JavaLanguageTools implements LanguageTools {
    * @returns Lookup key to find this test case in the TestRunTracker.
    */
   mapTestFinishDataToLookupKey(testFinishData: TestFinish): string | undefined {
-    if (testFinishData.dataKind === TestFinishDataKind.JUnitStyleTestCaseData) {
+    if (
+      testFinishData.dataKind === TestFinishDataKind.JUnitStyleTestCaseData &&
+      testFinishData.data
+    ) {
       const testCaseData = testFinishData.data as JUnitStyleTestCaseData
       if (testCaseData.className !== undefined) {
-        return `${testCaseData.className}.${testFinishData.displayName}`
+        let testCaseName = testFinishData.displayName
+
+        // In case of a parameterized test, keep the method name.
+        const match = testCaseName.match(PARAMETERIZED_TEST_REGEX)
+        if (match?.groups?.lookupKey) {
+          testCaseName = match.groups.lookupKey
+        }
+
+        // Use the class name as the base, and append the test case name if available.
+        let result = testCaseData.className
+        if (testCaseName.length > 0) result += `.${testCaseName}`
+        return result
       } else {
         return testFinishData.displayName
       }

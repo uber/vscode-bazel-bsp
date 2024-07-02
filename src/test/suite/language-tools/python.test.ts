@@ -88,38 +88,242 @@ suite('Python Language Tools', () => {
     assert.ok(executeCommandStub.notCalled)
   })
 
-  test('map test finish data to lookup key', async () => {
-    let result = languageTools.mapTestFinishDataToLookupKey({
-      displayName: 'test_method',
-      status: TestStatus.Failed,
-      dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
-      data: {
-        time: 0,
-        className: 'my.example.test_example.TestMyClass',
+  const testCases = [
+    {
+      description: 'method within a class',
+      input: {
+        displayName: 'test_method',
+        status: TestStatus.Failed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 0,
+          className: 'my.example.test_example.TestMyClass',
+        },
       },
-    })
-    assert.strictEqual(
-      result,
-      'my.example.test_example.TestMyClass.test_method'
-    )
-
-    result = languageTools.mapTestFinishDataToLookupKey({
-      displayName: 'test_method',
-      status: TestStatus.Failed,
-      dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
-      data: {
-        time: 0,
-        className: 'my.example.test_example',
+      expected: 'my.example.test_example.TestMyClass.test_method',
+    },
+    {
+      description: 'standalone method',
+      input: {
+        displayName: 'test_method',
+        status: TestStatus.Failed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 0,
+          className: 'my.example.test_example',
+        },
       },
-    })
-    assert.strictEqual(result, 'my.example.test_example.test_method')
+      expected: 'my.example.test_example.test_method',
+    },
+    {
+      description: 'parameterized test result',
+      input: {
+        displayName: 'test_method[example1]',
+        status: TestStatus.Failed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 0,
+          className: 'my.example.test_example',
+        },
+      },
+      expected: 'my.example.test_example.test_method',
+    },
+    {
+      description: 'parameterized test with special characters',
+      input: {
+        displayName: 'test_method[example1!@#]',
+        status: TestStatus.Passed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 1,
+          className: 'my.special.chars_example',
+        },
+      },
+      expected: 'my.special.chars_example.test_method',
+    },
+    {
+      description: 'parameterized test with spaces',
+      input: {
+        displayName: 'test_method[example with spaces]',
+        status: TestStatus.Skipped,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 0.5,
+          className: 'my.space.test_example',
+        },
+      },
+      expected: 'my.space.test_example.test_method',
+    },
+    {
+      description: 'parameterized test with multiple brackets',
+      input: {
+        displayName: 'test_method[example[inner]]',
+        status: TestStatus.Failed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 2,
+          className: 'my.multibracket.test_example',
+        },
+      },
+      expected: 'my.multibracket.test_example.test_method',
+    },
+    {
+      description: 'parameterized test with numbers',
+      input: {
+        displayName: 'test_method[12345]',
+        status: TestStatus.Passed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 0.1,
+          className: 'my.numeric.test_example',
+        },
+      },
+      expected: 'my.numeric.test_example.test_method',
+    },
+    {
+      description: 'parameterized test with empty brackets',
+      input: {
+        displayName: 'test_method[]',
+        status: TestStatus.Failed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 1.5,
+          className: 'my.emptybracket.test_example',
+        },
+      },
+      expected: 'my.emptybracket.test_example.test_method',
+    },
+    {
+      description: 'parameterized test with special symbols',
+      input: {
+        displayName: 'test_method[!@#$%^&*()]',
+        status: TestStatus.Skipped,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 3,
+          className: 'my.symbols.test_example',
+        },
+      },
+      expected: 'my.symbols.test_example.test_method',
+    },
+    {
+      description: 'parameterized test with long name',
+      input: {
+        displayName: 'test_method[averylongsubtestnamethatisunusuallylong]',
+        status: TestStatus.Failed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 2.5,
+          className: 'my.longname.test_example',
+        },
+      },
+      expected: 'my.longname.test_example.test_method',
+    },
+    {
+      description: 'parameterized test with nested brackets',
+      input: {
+        displayName: 'test_method[example[nested[brackets]]]',
+        status: TestStatus.Passed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 0.2,
+          className: 'my.nestedbrackets.test_example',
+        },
+      },
+      expected: 'my.nestedbrackets.test_example.test_method',
+    },
+    {
+      description: 'result with no data',
+      input: {
+        displayName: 'pytest',
+        status: TestStatus.Failed,
+      },
+      expected: undefined,
+    },
+    {
+      description: 'successful test case',
+      input: {
+        displayName: 'test_successful_method',
+        status: TestStatus.Passed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 1,
+          className: 'my.example.test_example.TestMyClass',
+        },
+      },
+      expected: 'my.example.test_example.TestMyClass.test_successful_method',
+    },
+    {
+      description: 'unknown dataKind',
+      input: {
+        displayName: 'unknown_test',
+        status: TestStatus.Failed,
+        dataKind: 'UnknownDataKind',
+        data: {
+          time: 0,
+          className: 'my.example.test_example.UnknownClass',
+        },
+      },
+      expected: undefined,
+    },
+    {
+      description: 'method with special characters',
+      input: {
+        displayName: 'test_method_with_special_chars!@#',
+        status: TestStatus.Failed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 0,
+          className: 'my.example.test_example.TestMyClass',
+        },
+      },
+      expected:
+        'my.example.test_example.TestMyClass.test_method_with_special_chars!@#',
+    },
+    {
+      description: 'method with numeric displayName',
+      input: {
+        displayName: '123456',
+        status: TestStatus.Failed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 0,
+          className: 'my.example.test_example.TestMyClass',
+        },
+      },
+      expected: 'my.example.test_example.TestMyClass.123456',
+    },
+    {
+      description: 'empty string as displayName',
+      input: {
+        displayName: '',
+        status: TestStatus.Failed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 0,
+          className: 'my.example.test_example.TestMyClass',
+        },
+      },
+      expected: 'my.example.test_example.TestMyClass',
+    },
+    {
+      description: 'null data gracefully',
+      input: {
+        displayName: 'null_data_test',
+        status: TestStatus.Failed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: null,
+      },
+      expected: undefined,
+    },
+  ]
 
-    result = languageTools.mapTestFinishDataToLookupKey({
-      displayName: 'pytest',
-      status: TestStatus.Failed,
+  for (const testCase of testCases) {
+    test(`map test finish data to lookup key: ${testCase.description}`, async () => {
+      const result = languageTools.mapTestFinishDataToLookupKey(testCase.input)
+      assert.strictEqual(result, testCase.expected)
     })
-    assert.strictEqual(result, undefined)
-  })
+  }
 
   test('map test case info to lookup key', async () => {
     let testInfo = testController.createTestItem('test1', 'test1')

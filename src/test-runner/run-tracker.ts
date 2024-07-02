@@ -128,6 +128,7 @@ export class TestRunTracker implements TaskOriginHandlers {
 
   /**
    * Updates an item's status, both within this test run tracker and in the test explorer UI.
+   * This may be called more than once for the same test item, in which case only the highest status (per TestCaseStatus enum) will be retained.
    * @param item TestItem for which the status will be updated.
    * @param status New status value.
    * @param message (optional) Message to be shown to report an outcome. Only applicable for Failed and Errored states.
@@ -137,6 +138,13 @@ export class TestRunTracker implements TaskOriginHandlers {
     status: TestCaseStatus,
     message?: vscode.TestMessage
   ) {
+    const currentStatus = this.status.get(item)
+    if (currentStatus && status < currentStatus) {
+      // Only update if the new status is ranked higher than the existing one.
+      // This allows multiple updates to be made to a test item, while only showing the highest status in the UI.
+      return
+    }
+
     this.status.set(item, status)
     switch (status) {
       case TestCaseStatus.Started:
@@ -395,7 +403,9 @@ export class TestRunTracker implements TaskOriginHandlers {
   }
 }
 
-function formatTestResultMessage(result): vscode.TestMessage | undefined {
+function formatTestResultMessage(
+  result: TestFinish
+): vscode.TestMessage | undefined {
   let message =
     // Ignore 'null' string as well.
     // TODO(IDE-1133): Ensure server does not convert null values to string.
@@ -405,6 +415,9 @@ function formatTestResultMessage(result): vscode.TestMessage | undefined {
 
   if (result.dataKind === TestFinishDataKind.JUnitStyleTestCaseData) {
     const testCaseData = result.data as JUnitStyleTestCaseData
+    if (result.displayName) {
+      message += `${ANSI_CODES.RED}[TEST CASE]${ANSI_CODES.RESET} ${result.displayName}\n\n`
+    }
     if (testCaseData.errorType && testCaseData.fullError !== 'null') {
       message += `${ANSI_CODES.RED}[ERROR TYPE]${ANSI_CODES.RESET} ${testCaseData.errorType}\n\n`
     }
