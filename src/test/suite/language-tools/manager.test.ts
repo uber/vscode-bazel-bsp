@@ -52,4 +52,25 @@ suite('Language Tools Manager', () => {
     const result = languageTools.getLanguageTools(target)
     assert.strictEqual(result.constructor.name, 'BaseLanguageTools')
   })
+
+  test('get tools for file, python', async () => {
+    const result = languageTools.getLanguageToolsForFile({
+      languageId: 'python',
+    } as any)
+    assert.strictEqual(result.constructor.name, 'PythonLanguageTools')
+  })
+
+  test('get tools for file, java', async () => {
+    const result = languageTools.getLanguageToolsForFile({
+      languageId: 'java',
+    } as any)
+    assert.strictEqual(result.constructor.name, 'JavaLanguageTools')
+  })
+
+  test('get tools for file, other', async () => {
+    const result = languageTools.getLanguageToolsForFile({
+      languageId: 'other',
+    } as any)
+    assert.strictEqual(result.constructor.name, 'BaseLanguageTools')
+  })
 })

@@ -28,7 +28,7 @@ export class BaseLanguageTools implements LanguageTools {
   /**
    * No support for individual test cases or test file identification.
    * @param document URI of the document to be analyzed for test cases.
-   * @returns Result always contains isTestFile value of true, and no test cases.
+   * @returns Result always contains isTestFile value of false, and no test cases.
    */
   async getDocumentTestCases(
     document: vscode.Uri,
@@ -36,7 +36,7 @@ export class BaseLanguageTools implements LanguageTools {
   ): Promise<TestFileContents> {
     return {
       // Do not filter out any files.
-      isTestFile: true,
+      isTestFile: false,
       // No test case discovery.
       testCases: [],
     }

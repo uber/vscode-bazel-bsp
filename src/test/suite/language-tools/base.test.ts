@@ -30,7 +30,7 @@ suite('Base Language Tools', () => {
       vscode.Uri.parse('file:///repo/root/sample/my_test.py'),
       '/repo/root/'
     )
-    assert.strictEqual(result.isTestFile, true)
+    assert.strictEqual(result.isTestFile, false)
     assert.strictEqual(result.testCases.length, 0)
   })
 

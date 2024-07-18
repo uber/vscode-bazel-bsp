@@ -19,6 +19,7 @@ import {TestItemFactory} from '../../test-info/test-item-factory'
 import {CoverageTracker} from '../../coverage-utils/coverage-tracker'
 import {LanguageToolManager} from '../../language-tools/manager'
 import sinon from 'sinon'
+import {BuildTargetIdentifier} from 'src/bsp/bsp'
 
 suite('Test Controller', () => {
   let ctx: vscode.ExtensionContext
@@ -140,5 +141,25 @@ suite('Test Controller', () => {
     for (const spy of disposeSpies) {
       assert.ok(spy.called)
     }
+  })
+
+  test('store target identifiers', async () => {
+    await testCaseStore.onModuleInit()
+
+    const item = testCaseStore.testController.createTestItem('test', '')
+    const targetIdentifier: BuildTargetIdentifier = {
+      uri: 'file:///path/to/test',
+    }
+    testCaseStore.setTargetIdentifier(targetIdentifier, item)
+    assert.strictEqual(
+      testCaseStore.getTargetIdentifier(targetIdentifier),
+      item
+    )
+
+    testCaseStore.clearTargetIdentifiers()
+    assert.strictEqual(
+      testCaseStore.getTargetIdentifier(targetIdentifier),
+      undefined
+    )
   })
 })

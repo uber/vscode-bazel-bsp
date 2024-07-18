@@ -187,6 +187,8 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     const directories = new Map<string, vscode.TestItem>()
     const buildFileName = getExtensionSetting(SettingName.BUILD_FILE_NAME)
     parentTest.children.replace([])
+    this.store.clearTargetIdentifiers()
+
     result.targets.forEach(target => {
       if (!target.capabilities.canTest) return
 
@@ -211,6 +213,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
         buildFileUri
       )
       relevantParent.children.add(newTest)
+      this.store.setTargetIdentifier(target.id, newTest)
     })
 
     // If no test items were added, show the getting started message as a test message overlaid on the .bazelproject file.
@@ -235,6 +238,88 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     // Replace all children with the newly returned test cases.
     this.condenseTestItems(parentTest)
     updateDescription(parentTest)
+
+    await this.resolveOpenSourceFiles()
+  }
+
+  /**
+   * Kick off resolution of test items for files that are currently open, and watch for newly opened files.
+   * This allows test cases to appear without the user having to expand the target's test explorer node.
+   */
+  private async resolveOpenSourceFiles() {
+    const autoExpandTarget = getExtensionSetting(SettingName.AUTO_EXPAND_TARGET)
+    // When disabled, tests are discovered as the test explorer tree is expanded.
+    if (!autoExpandTarget) return
+
+    for (const doc of vscode.workspace.textDocuments) {
+      // Discovery within currently open documents.
+      await this.expandTargetsForDocument(doc)
+    }
+
+    this.ctx.subscriptions.push(
+      vscode.workspace.onDidOpenTextDocument(async doc => {
+        // Discovery within newly opened documents.
+        await this.expandTargetsForDocument(doc)
+      })
+    )
+  }
+
+  /**
+   * Finds the corresponding target for a given document, if a file's target is not yet known.
+   * The target's test cases will then be resolved and available in test explorer.
+   * @param doc for which to find the target.
+   */
+  private async expandTargetsForDocument(doc: vscode.TextDocument) {
+    if (doc.uri.scheme !== 'file') return
+
+    // Avoid checking files that are already known, or not test files.
+    if (this.store.knownFiles.has(doc.uri.toString())) return
+    const tools = this.languageToolManager.getLanguageToolsForFile(doc)
+    const docInfo = await tools.getDocumentTestCases(
+      doc.uri,
+      this.repoRoot ?? ''
+    )
+    if (!docInfo.isTestFile) return
+
+    this.store.knownFiles.add(doc.uri.toString())
+    const conn = await this.buildServer.getConnection()
+    const params: bsp.InverseSourcesParams = {
+      textDocument: {
+        uri: doc.uri.toString(),
+      },
+    }
+    let result: bsp.InverseSourcesResult | undefined
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `Getting target for ${path.basename(doc.uri.fsPath)}.`,
+        cancellable: true,
+      },
+      async (progress, token) => {
+        result = await conn.sendRequest(
+          bsp.BuildTargetInverseSources.type,
+          params,
+          token
+        )
+      }
+    )
+
+    if (!result) {
+      // TODO(IDE-1203): Add more guidance to update their sync scope.
+      this.outputChannel.appendLine(`Target not in scope for ${doc.fileName}.`)
+      return
+    }
+
+    for (const target of result.targets) {
+      const targetItem = this.store.getTargetIdentifier(target)
+      if (targetItem) {
+        await this.resolveHandler(targetItem)
+      } else {
+        this.outputChannel.appendLine(
+          `Couldn't find a matching test item for ${target.uri}.`
+        )
+      }
+    }
   }
 
   /**
@@ -264,6 +349,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
 
     const directories = new Map<string, vscode.TestItem>()
     parentTest.children.replace([])
+    parentTest.canResolveChildren = false
     const allDocumentTestItems: vscode.TestItem[] = []
     result.items.forEach(target => {
       target.sources.forEach(source => {
@@ -290,6 +376,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
           parentTarget,
           source
         )
+        this.store.knownFiles.add(source.uri)
 
         relevantParent.children.add(newTest)
         allDocumentTestItems.push(newTest)

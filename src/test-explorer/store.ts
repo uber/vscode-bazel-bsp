@@ -6,6 +6,7 @@ import {
   TEST_CONTROLLER_TOKEN,
 } from '../custom-providers'
 import {TestCaseInfo} from '../test-info/test-info'
+import {BuildTargetIdentifier} from 'src/bsp/bsp'
 
 export class TestCaseStore implements OnModuleInit, vscode.Disposable {
   @Inject(EXTENSION_CONTEXT_TOKEN) private readonly ctx: vscode.ExtensionContext
@@ -15,10 +16,14 @@ export class TestCaseStore implements OnModuleInit, vscode.Disposable {
 
   // Watcher to update a test item's children.  Key corresponds to the test item ID.
   testItemWatchers: Map<string, vscode.FileSystemWatcher>
+  knownFiles: Set<string>
+  private targetIdentifiers: Map<string, vscode.TestItem>
 
   constructor() {
     this.testCaseMetadata = new WeakMap<vscode.TestItem, TestCaseInfo>()
     this.testItemWatchers = new Map()
+    this.targetIdentifiers = new Map<string, vscode.TestItem>()
+    this.knownFiles = new Set<string>()
   }
 
   onModuleInit() {
@@ -58,5 +63,24 @@ export class TestCaseStore implements OnModuleInit, vscode.Disposable {
       })
     }
     clear(parentTest)
+  }
+
+  setTargetIdentifier(
+    targetIdentifier: BuildTargetIdentifier,
+    item: vscode.TestItem
+  ) {
+    const key = JSON.stringify(targetIdentifier)
+    this.targetIdentifiers.set(key, item)
+  }
+
+  getTargetIdentifier(
+    targetIdentifier: BuildTargetIdentifier
+  ): vscode.TestItem | undefined {
+    const key = JSON.stringify(targetIdentifier)
+    return this.targetIdentifiers.get(key)
+  }
+
+  clearTargetIdentifiers() {
+    this.targetIdentifiers.clear()
   }
 }
