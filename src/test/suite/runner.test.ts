@@ -29,6 +29,7 @@ import * as bsp from '../../bsp/bsp'
 import {TestItemFactory} from '../../test-info/test-item-factory'
 import {CoverageTracker} from '../../coverage-utils/coverage-tracker'
 import {LanguageToolManager} from '../../language-tools/manager'
+import {SyncHintDecorationsManager} from '../../test-explorer/decorator'
 
 suite('Test Runner', () => {
   let ctx: vscode.ExtensionContext
@@ -47,7 +48,10 @@ suite('Test Runner', () => {
 
     buildClientStub = sandbox.createStubInstance(BazelBSPBuildClient)
 
-    ctx = {subscriptions: []} as unknown as vscode.ExtensionContext
+    ctx = {
+      subscriptions: [],
+      asAbsolutePath: (relativePath: string) => `/sample/${relativePath}`,
+    } as unknown as vscode.ExtensionContext
     const moduleRef = await Test.createTestingModule({
       providers: [
         outputChannelProvider,
@@ -59,6 +63,7 @@ suite('Test Runner', () => {
         TestItemFactory,
         CoverageTracker,
         LanguageToolManager,
+        SyncHintDecorationsManager,
       ],
     })
       .useMocker(token => {

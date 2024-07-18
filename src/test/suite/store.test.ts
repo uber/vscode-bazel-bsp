@@ -20,6 +20,7 @@ import {CoverageTracker} from '../../coverage-utils/coverage-tracker'
 import {LanguageToolManager} from '../../language-tools/manager'
 import sinon from 'sinon'
 import {BuildTargetIdentifier} from 'src/bsp/bsp'
+import {SyncHintDecorationsManager} from '../../test-explorer/decorator'
 
 suite('Test Controller', () => {
   let ctx: vscode.ExtensionContext
@@ -29,7 +30,10 @@ suite('Test Controller', () => {
   beforeEach(async () => {
     sandbox = sinon.createSandbox()
 
-    ctx = {subscriptions: []} as unknown as vscode.ExtensionContext
+    ctx = {
+      subscriptions: [],
+      asAbsolutePath: (relativePath: string) => `/sample/${relativePath}`,
+    } as unknown as vscode.ExtensionContext
     const moduleRef = await Test.createTestingModule({
       providers: [
         outputChannelProvider,
@@ -44,6 +48,7 @@ suite('Test Controller', () => {
         TestItemFactory,
         CoverageTracker,
         LanguageToolManager,
+        SyncHintDecorationsManager,
       ],
     })
       .useMocker(token => {

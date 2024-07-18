@@ -18,6 +18,7 @@ import {BazelBSPInstaller} from './server/install'
 import {TestItemFactory} from './test-info/test-item-factory'
 import {CoverageTracker} from './coverage-utils/coverage-tracker'
 import {LanguageToolManager} from './language-tools/manager'
+import {SyncHintDecorationsManager} from './test-explorer/decorator'
 
 export async function bootstrap(context: vscode.ExtensionContext) {
   // Define the application's dependencies.  This is done at runtime to allow for dynamically created providers such as extension context.
@@ -38,6 +39,7 @@ export async function bootstrap(context: vscode.ExtensionContext) {
       TestItemFactory,
       CoverageTracker,
       LanguageToolManager,
+      SyncHintDecorationsManager,
       testControllerProvider,
     ],
   })
