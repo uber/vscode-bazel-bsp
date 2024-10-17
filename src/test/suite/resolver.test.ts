@@ -17,7 +17,7 @@ import {
   contextProviderFactory,
   outputChannelProvider,
 } from '../../custom-providers'
-import {createSampleMessageConnection} from './test-utils'
+import {createSampleMessageConnection, sampleTestData} from './test-utils'
 import {MessageConnection} from 'vscode-jsonrpc'
 import {Utils} from '../../utils/utils'
 import * as bsp from '../../bsp/bsp'
@@ -44,6 +44,7 @@ suite('Test Resolver', () => {
   let buildClientStub: sinon.SinonStubbedInstance<BazelBSPBuildClient>
   let languageToolsStub: sinon.SinonStubbedInstance<LanguageTools>
   let sampleConn: MessageConnection
+  let extensionSettingStub: sinon.Stub
 
   const sandbox = sinon.createSandbox()
 
@@ -80,6 +81,9 @@ suite('Test Resolver', () => {
         } else if (token === LanguageToolManager) {
           return {
             getLanguageTools: target => {
+              return languageToolsStub
+            },
+            getLanguageToolsForFile: (document: vscode.TextDocument) => {
               return languageToolsStub
             },
           }
@@ -209,6 +213,50 @@ suite('Test Resolver', () => {
       }
     }
 
+    const getSampleDocumentTestItems = (): DocumentTestItem[] => {
+      const result: DocumentTestItem[] = [
+        {
+          name: 'test_case_1',
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+          ),
+          uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
+          testFilter: 'test_case_1',
+        },
+        {
+          name: 'test_case_2',
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+          ),
+          uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
+          testFilter: 'test_case_2',
+        },
+        {
+          name: 'sub_test_case_1',
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+          ),
+          uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
+          testFilter: 'sub_test_case_2',
+        },
+        {
+          name: 'sub_test_case_2',
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+          ),
+          uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
+          testFilter: 'sub_test_case_2',
+        },
+      ]
+      result[2].parent = result[0]
+      result[3].parent = result[1]
+      return result
+    }
+
     beforeEach(() => {
       testCaseStore.onModuleInit()
       testResolver.onModuleInit()
@@ -221,8 +269,9 @@ suite('Test Resolver', () => {
       })
 
       sandbox.stub(Utils, 'getWorkspaceGitRoot').resolves('/repo/root')
-      sandbox
-        .stub(settings, 'getExtensionSetting')
+      extensionSettingStub = sandbox.stub(settings, 'getExtensionSetting')
+
+      extensionSettingStub
         .withArgs(settings.SettingName.BAZEL_PROJECT_FILE_PATH)
         .onFirstCall()
         .returns('./projectview.bazelproject')
@@ -429,48 +478,7 @@ suite('Test Resolver', () => {
         vscode.Uri.parse('file:///sample/path/test_file.py')
       )
 
-      // Two test items with 1 child each.
-      const testCases: DocumentTestItem[] = [
-        {
-          name: 'test_case_1',
-          range: new vscode.Range(
-            new vscode.Position(0, 0),
-            new vscode.Position(0, 0)
-          ),
-          uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
-          testFilter: 'test_case_1',
-        },
-        {
-          name: 'test_case_2',
-          range: new vscode.Range(
-            new vscode.Position(0, 0),
-            new vscode.Position(0, 0)
-          ),
-          uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
-          testFilter: 'test_case_2',
-        },
-        {
-          name: 'sub_test_case_1',
-          range: new vscode.Range(
-            new vscode.Position(0, 0),
-            new vscode.Position(0, 0)
-          ),
-          uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
-          testFilter: 'sub_test_case_2',
-        },
-        {
-          name: 'sub_test_case_2',
-          range: new vscode.Range(
-            new vscode.Position(0, 0),
-            new vscode.Position(0, 0)
-          ),
-          uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
-          testFilter: 'sub_test_case_2',
-        },
-      ]
-      testCases[2].parent = testCases[0]
-      testCases[3].parent = testCases[1]
-
+      const testCases = getSampleDocumentTestItems()
       languageToolsStub.getDocumentTestCases.resolves({
         isTestFile: true,
         testCases: testCases,
@@ -503,6 +511,118 @@ suite('Test Resolver', () => {
       testCases[0].name = 'test_case_1_renamed'
       await testCaseStore.testController.resolveHandler(sourceFileTestItem)
       assert.equal(sourceFileTestItem.children.size, 2)
+    })
+
+    test('expand targets based on open files', async () => {
+      // Setup
+      const sendRequestStub = sandbox.stub(sampleConn, 'sendRequest')
+
+      // Expect a sequence of 3 BSP requests.
+      sendRequestStub
+        .onFirstCall()
+        // Initial load
+        .resolves(sampleBuildTargetsResult)
+        .onSecondCall()
+        // Request for an unknown document's target
+        .resolves({targets: [sampleBuildTargetsResult.targets[0].id]})
+        .onThirdCall()
+        // Request for the rest of the target's sources
+        .resolves(sampleSourceItemsResult(sampleBuildTargetsResult.targets[0]))
+
+      extensionSettingStub
+        .withArgs(settings.SettingName.AUTO_EXPAND_TARGET)
+        .returns(true)
+
+      const documentStub = {
+        uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
+        languageId: 'python',
+      }
+
+      languageToolsStub.getDocumentTestCases.resolves({
+        isTestFile: true,
+        testCases: getSampleDocumentTestItems(),
+        documentTest: {
+          name: 'My Document',
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+          ),
+          uri: documentStub.uri,
+          testFilter: 'test_file.py',
+        },
+      })
+
+      const workspaceTextDocumentStub = sandbox
+        .stub(vscode.workspace, 'textDocuments')
+        .get(() => [documentStub])
+
+      const root = testCaseStore.testController.createTestItem(
+        'root',
+        'Bazel Test Targets'
+      )
+      testCaseStore.testController.items.add(root)
+      testCaseStore.testCaseMetadata.set(
+        root,
+        new TestCaseInfo(root, undefined, TestItemType.Root)
+      )
+      assert.ok(testCaseStore.testController.resolveHandler)
+
+      // Execute
+      await testCaseStore.testController.resolveHandler(root)
+
+      // Validate expected document positions in the tree.
+      const docTestItem = [
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/a')
+          ?.children.get('a')
+          ?.children.get(
+            '{sourcefile}:a:/repo/root/base/directory/a/MyFile1.language'
+          ),
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/a')
+          ?.children.get('a')
+          ?.children.get(
+            '{sourcefile}:a:/repo/root/base/directory/a/MyFile2.language'
+          ),
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/a')
+          ?.children.get('a')
+          ?.children.get('{sourcedir}:a:/repo/root/base/directory/a/src/dir')
+          ?.children.get('{sourcedir}:a:/repo/root/base/directory/a/src/dir/1')
+          ?.children.get(
+            '{sourcefile}:a:/repo/root/base/directory/a/src/dir/1/MyFile4.language'
+          ),
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/a')
+          ?.children.get('a')
+          ?.children.get('{sourcedir}:a:/repo/root/base/directory/a/src/dir')
+          ?.children.get('{sourcedir}:a:/repo/root/base/directory/a/src/dir/2')
+          ?.children.get(
+            '{sourcefile}:a:/repo/root/base/directory/a/src/dir/2/MyFile5.language'
+          ),
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/a')
+          ?.children.get('a')
+          ?.children.get('{sourcedir}:a:/repo/root/base/directory/a/src/dir')
+          ?.children.get('{sourcedir}:a:/repo/root/base/directory/a/src/dir/2')
+          ?.children.get(
+            '{sourcefile}:a:/repo/root/base/directory/a/src/dir/2/MyFile6.language'
+          ),
+      ]
+
+      for (const item of docTestItem) {
+        assert.ok(item)
+        assert.equal(item.children.size, 2)
+        item.children.forEach(child => {
+          assert.ok(testCaseStore.testCaseMetadata.get(child))
+          assert.equal(child.children.size, 1)
+        })
+      }
     })
 
     test('refresh success', async () => {

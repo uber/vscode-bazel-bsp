@@ -54,4 +54,13 @@ export class LanguageToolManager {
     }
     return this.baseLanguageTools
   }
+
+  getLanguageToolsForFile(document: vscode.TextDocument): LanguageTools {
+    if (document.languageId === 'python') {
+      return this.pythonLanguageTools
+    } else if (document.languageId === 'java') {
+      return this.javaLanguageTools
+    }
+    return this.baseLanguageTools
+  }
 }

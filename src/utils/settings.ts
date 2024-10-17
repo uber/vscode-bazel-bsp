@@ -8,6 +8,7 @@ export enum SettingName {
   BSP_SERVER_VERSION = 'serverVersion',
   BAZEL_BINARY_PATH = 'bazelBinaryPath',
   SERVER_INSTALL_MODE = 'serverInstallMode',
+  AUTO_EXPAND_TARGET = 'autoExpandTarget',
 }
 
 export interface SettingTypes {
@@ -16,6 +17,7 @@ export interface SettingTypes {
   [SettingName.BSP_SERVER_VERSION]: string
   [SettingName.BAZEL_BINARY_PATH]: string
   [SettingName.SERVER_INSTALL_MODE]: string
+  [SettingName.AUTO_EXPAND_TARGET]: boolean
 }
 
 export function getExtensionSetting<T extends keyof SettingTypes>(
