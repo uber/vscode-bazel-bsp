@@ -262,6 +262,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     }
 
     if (this.openDocumentWatcherEnabled) return
+    this.openDocumentWatcherEnabled = true
     this.ctx.subscriptions.push(
       vscode.workspace.onDidOpenTextDocument(async doc => {
         // Discovery within newly opened documents.
