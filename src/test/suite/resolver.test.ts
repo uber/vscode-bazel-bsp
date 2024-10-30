@@ -35,6 +35,7 @@ import {
   LanguageTools,
 } from '../../language-tools/manager'
 import {BaseLanguageTools} from '../../language-tools/base'
+import {SyncHintDecorationsManager} from '../../test-explorer/decorator'
 
 suite('Test Resolver', () => {
   let ctx: vscode.ExtensionContext
@@ -43,6 +44,7 @@ suite('Test Resolver', () => {
   let buildServerStub: sinon.SinonStubbedInstance<BuildServerManager>
   let buildClientStub: sinon.SinonStubbedInstance<BazelBSPBuildClient>
   let languageToolsStub: sinon.SinonStubbedInstance<LanguageTools>
+  let syncHintStub: sinon.SinonStubbedInstance<SyncHintDecorationsManager>
   let sampleConn: MessageConnection
   let extensionSettingStub: sinon.Stub
 
@@ -57,13 +59,16 @@ suite('Test Resolver', () => {
 
     buildClientStub = sandbox.createStubInstance(BazelBSPBuildClient)
     languageToolsStub = sandbox.createStubInstance(BaseLanguageTools)
+    syncHintStub = sandbox.createStubInstance(SyncHintDecorationsManager)
 
     // Return a fixed workspace root to avoid impact of local environment.
     sandbox
       .stub(Utils, 'getWorkspaceRoot')
       .returns(vscode.Uri.parse('file:///workspace'))
-
-    ctx = {subscriptions: []} as unknown as vscode.ExtensionContext
+    ctx = {
+      subscriptions: [],
+      asAbsolutePath: (relativePath: string) => `/sample/${relativePath}`,
+    } as unknown as vscode.ExtensionContext
     const moduleRef = await Test.createTestingModule({
       providers: [
         outputChannelProvider,
@@ -78,6 +83,8 @@ suite('Test Resolver', () => {
           return buildServerStub
         } else if (token === BazelBSPBuildClient) {
           return buildClientStub
+        } else if (token === SyncHintDecorationsManager) {
+          return syncHintStub
         } else if (token === LanguageToolManager) {
           return {
             getLanguageTools: target => {
@@ -257,6 +264,14 @@ suite('Test Resolver', () => {
       return result
     }
 
+    const documentStub = {
+      uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
+      languageId: 'python',
+    }
+
+    let onDidOpenStub: sinon.SinonStub
+    let sendRequestStub: sinon.SinonStub
+
     beforeEach(() => {
       testCaseStore.onModuleInit()
       testResolver.onModuleInit()
@@ -277,6 +292,12 @@ suite('Test Resolver', () => {
         .returns('./projectview.bazelproject')
         .onSecondCall()
         .returns('./projectview2.bazelproject')
+
+      sandbox.stub(vscode.workspace, 'textDocuments').get(() => [documentStub])
+
+      onDidOpenStub = sandbox.stub(vscode.workspace, 'onDidOpenTextDocument')
+      onDidOpenStub.returns({dispose: () => {}})
+      sendRequestStub = sandbox.stub(sampleConn, 'sendRequest')
     })
 
     test('root', async () => {
@@ -305,9 +326,7 @@ suite('Test Resolver', () => {
     })
 
     test('targets below root', async () => {
-      const sendRequestStub = sandbox
-        .stub(sampleConn, 'sendRequest')
-        .returns(Promise.resolve(sampleBuildTargetsResult))
+      sendRequestStub.returns(Promise.resolve(sampleBuildTargetsResult))
 
       const root = testCaseStore.testController.createTestItem(
         'root',
@@ -382,9 +401,7 @@ suite('Test Resolver', () => {
       assert.ok(testCaseStore.testController.resolveHandler)
 
       // Simulate an error in requesting targets.
-      const sendRequestStub = sandbox
-        .stub(sampleConn, 'sendRequest')
-        .returns(Promise.reject(new Error('sample error')))
+      sendRequestStub.returns(Promise.reject(new Error('sample error')))
       try {
         await testCaseStore.testController.resolveHandler(root)
         assert.fail('Expected error')
@@ -409,9 +426,7 @@ suite('Test Resolver', () => {
       const emptyResult: bsp.WorkspaceBuildTargetsResult = {
         targets: [],
       }
-      const sendRequestStub = sandbox
-        .stub(sampleConn, 'sendRequest')
-        .resolves(emptyResult)
+      sendRequestStub.resolves(emptyResult)
       await testCaseStore.testController.resolveHandler(root)
       const message = root.error as vscode.MarkdownString
       assert.ok(message.value.includes('No test targets found'))
@@ -419,9 +434,7 @@ suite('Test Resolver', () => {
 
     test('source files within a target', async () => {
       const buildTarget = sampleBuildTargetsResult.targets[0]
-      const sendRequestStub = sandbox
-        .stub(sampleConn, 'sendRequest')
-        .returns(Promise.resolve(sampleSourceItemsResult(buildTarget)))
+      sendRequestStub.resolves(sampleSourceItemsResult(buildTarget))
 
       languageToolsStub.getDocumentTestCases.resolves({
         isTestFile: true,
@@ -513,10 +526,7 @@ suite('Test Resolver', () => {
       assert.equal(sourceFileTestItem.children.size, 2)
     })
 
-    test('expand targets based on open files', async () => {
-      // Setup
-      const sendRequestStub = sandbox.stub(sampleConn, 'sendRequest')
-
+    test('expand targets based on open files, success', async () => {
       // Expect a sequence of 3 BSP requests.
       sendRequestStub
         .onFirstCall()
@@ -533,11 +543,6 @@ suite('Test Resolver', () => {
         .withArgs(settings.SettingName.AUTO_EXPAND_TARGET)
         .returns(true)
 
-      const documentStub = {
-        uri: vscode.Uri.parse('file:///sample/path/test_file.py'),
-        languageId: 'python',
-      }
-
       languageToolsStub.getDocumentTestCases.resolves({
         isTestFile: true,
         testCases: getSampleDocumentTestItems(),
@@ -551,10 +556,6 @@ suite('Test Resolver', () => {
           testFilter: 'test_file.py',
         },
       })
-
-      const workspaceTextDocumentStub = sandbox
-        .stub(vscode.workspace, 'textDocuments')
-        .get(() => [documentStub])
 
       const root = testCaseStore.testController.createTestItem(
         'root',
@@ -623,12 +624,139 @@ suite('Test Resolver', () => {
           assert.equal(child.children.size, 1)
         })
       }
+      assert.ok(onDidOpenStub.calledOnce)
+    })
+
+    test('expand targets based on open files, error', async () => {
+      // Expect a sequence of 3 BSP requests.
+      sendRequestStub
+        .onFirstCall()
+        // Initial load
+        .resolves(sampleBuildTargetsResult)
+        .onSecondCall()
+        // Request for an unknown document's target
+        .rejects(new Error('sample error'))
+
+      extensionSettingStub
+        .withArgs(settings.SettingName.AUTO_EXPAND_TARGET)
+        .returns(true)
+
+      languageToolsStub.getDocumentTestCases.resolves({
+        isTestFile: true,
+        testCases: getSampleDocumentTestItems(),
+        documentTest: {
+          name: 'My Document',
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+          ),
+          uri: documentStub.uri,
+          testFilter: 'test_file.py',
+        },
+      })
+
+      const root = testCaseStore.testController.createTestItem(
+        'root',
+        'Bazel Test Targets'
+      )
+      testCaseStore.testController.items.add(root)
+      testCaseStore.testCaseMetadata.set(
+        root,
+        new TestCaseInfo(root, undefined, TestItemType.Root)
+      )
+      assert.ok(testCaseStore.testController.resolveHandler)
+
+      // Execute
+      await testCaseStore.testController.resolveHandler(root)
+
+      // Validate expected document positions in the tree.
+      const docTestItem = [
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/a')
+          ?.children.get('a'),
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/d')
+          ?.children.get('d'),
+      ]
+
+      for (const item of docTestItem) {
+        // Don't expand test items below the target level.
+        assert.ok(item)
+        assert.equal(item.children.size, 0)
+      }
+      assert.ok(onDidOpenStub.calledOnce)
+    })
+
+    test('expand targets based on open files, out of scope', async () => {
+      // Expect a sequence of 3 BSP requests.
+      sendRequestStub
+        .onFirstCall()
+        // Initial load
+        .resolves(sampleBuildTargetsResult)
+        .onSecondCall()
+        // Request for an unknown document's target
+        .resolves({targets: ['//other:target']})
+
+      extensionSettingStub
+        .withArgs(settings.SettingName.AUTO_EXPAND_TARGET)
+        .returns(true)
+
+      const docTestCases = {
+        isTestFile: true,
+        testCases: getSampleDocumentTestItems(),
+        documentTest: {
+          name: 'My Document',
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+          ),
+          uri: documentStub.uri,
+          testFilter: 'test_file.py',
+        },
+      }
+      languageToolsStub.getDocumentTestCases.resolves(docTestCases)
+
+      const root = testCaseStore.testController.createTestItem(
+        'root',
+        'Bazel Test Targets'
+      )
+      testCaseStore.testController.items.add(root)
+      testCaseStore.testCaseMetadata.set(
+        root,
+        new TestCaseInfo(root, undefined, TestItemType.Root)
+      )
+      assert.ok(testCaseStore.testController.resolveHandler)
+
+      // Execute
+      await testCaseStore.testController.resolveHandler(root)
+
+      // Validate expected document positions in the tree.
+      const docTestItem = [
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/a')
+          ?.children.get('a'),
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/d')
+          ?.children.get('d'),
+      ]
+
+      for (const item of docTestItem) {
+        // No matching targets to expand.
+        assert.ok(item)
+        assert.equal(item.children.size, 0)
+      }
+      assert.ok(
+        syncHintStub.enable.calledOnceWith(documentStub.uri, '', docTestCases)
+      )
+      assert.ok(onDidOpenStub.calledOnce)
     })
 
     test('refresh success', async () => {
-      const sendRequestStub = sandbox
-        .stub(sampleConn, 'sendRequest')
-        .resolves(sampleBuildTargetsResult)
+      sendRequestStub.resolves(sampleBuildTargetsResult)
 
       const root = testCaseStore.testController.createTestItem(
         'root',
@@ -649,10 +777,114 @@ suite('Test Resolver', () => {
       })
     })
 
+    test('expand targets based on open files, multiple calls', async () => {
+      extensionSettingStub
+        .withArgs(settings.SettingName.AUTO_EXPAND_TARGET)
+        .returns(true)
+
+      languageToolsStub.getDocumentTestCases.resolves({
+        isTestFile: true,
+        testCases: getSampleDocumentTestItems(),
+        documentTest: {
+          name: 'My Document',
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+          ),
+          uri: documentStub.uri,
+          testFilter: 'test_file.py',
+        },
+      })
+
+      const root = testCaseStore.testController.createTestItem(
+        'root',
+        'Bazel Test Targets'
+      )
+      testCaseStore.testController.items.add(root)
+      testCaseStore.testCaseMetadata.set(
+        root,
+        new TestCaseInfo(root, undefined, TestItemType.Root)
+      )
+      assert.ok(testCaseStore.testController.resolveHandler)
+
+      sendRequestStub
+        // First series of 3 requests.
+        .onCall(0)
+        .resolves(sampleBuildTargetsResult)
+        .onCall(1)
+        .resolves({targets: [sampleBuildTargetsResult.targets[0].id]})
+        .onCall(2)
+        .resolves(sampleSourceItemsResult(sampleBuildTargetsResult.targets[0]))
+        // Second series of 3 requests.
+        .onCall(3)
+        .resolves(sampleBuildTargetsResult)
+        .onCall(4)
+        .resolves({targets: [sampleBuildTargetsResult.targets[0].id]})
+        .onCall(5)
+        .resolves(sampleSourceItemsResult(sampleBuildTargetsResult.targets[0]))
+
+      await testCaseStore.testController.resolveHandler(root)
+      await testCaseStore.testController.resolveHandler(root)
+
+      // Validate expected document positions in the tree.
+      const docTestItem = [
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/a')
+          ?.children.get('a')
+          ?.children.get(
+            '{sourcefile}:a:/repo/root/base/directory/a/MyFile1.language'
+          ),
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/a')
+          ?.children.get('a')
+          ?.children.get(
+            '{sourcefile}:a:/repo/root/base/directory/a/MyFile2.language'
+          ),
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/a')
+          ?.children.get('a')
+          ?.children.get('{sourcedir}:a:/repo/root/base/directory/a/src/dir')
+          ?.children.get('{sourcedir}:a:/repo/root/base/directory/a/src/dir/1')
+          ?.children.get(
+            '{sourcefile}:a:/repo/root/base/directory/a/src/dir/1/MyFile4.language'
+          ),
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/a')
+          ?.children.get('a')
+          ?.children.get('{sourcedir}:a:/repo/root/base/directory/a/src/dir')
+          ?.children.get('{sourcedir}:a:/repo/root/base/directory/a/src/dir/2')
+          ?.children.get(
+            '{sourcefile}:a:/repo/root/base/directory/a/src/dir/2/MyFile5.language'
+          ),
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/a')
+          ?.children.get('a')
+          ?.children.get('{sourcedir}:a:/repo/root/base/directory/a/src/dir')
+          ?.children.get('{sourcedir}:a:/repo/root/base/directory/a/src/dir/2')
+          ?.children.get(
+            '{sourcefile}:a:/repo/root/base/directory/a/src/dir/2/MyFile6.language'
+          ),
+      ]
+
+      for (const item of docTestItem) {
+        assert.ok(item)
+        assert.equal(item.children.size, 2)
+        item.children.forEach(child => {
+          assert.ok(testCaseStore.testCaseMetadata.get(child))
+          assert.equal(child.children.size, 1)
+        })
+      }
+      assert.equal(sendRequestStub.callCount, 6)
+      assert.ok(onDidOpenStub.calledOnce)
+    })
+
     test('cancelled refresh', async () => {
-      const sendRequestStub = sandbox
-        .stub(sampleConn, 'sendRequest')
-        .rejects({code: CANCEL_ERROR_CODE})
+      sendRequestStub.rejects({code: CANCEL_ERROR_CODE})
 
       const root = testCaseStore.testController.createTestItem(
         'root',

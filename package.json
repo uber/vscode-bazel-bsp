@@ -26,6 +26,10 @@
         "command": "bazelbsp.showServerOutput",
         "title": "Bazel BSP: Show Server Output Channel",
         "icon": "$(output)"
+      },
+      {
+        "command": "bazelbsp.openProjectView",
+        "title": "Bazel BSP: Open Project View File"
       }
     ],
     "configuration": {

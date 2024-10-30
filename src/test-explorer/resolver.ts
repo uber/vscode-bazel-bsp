@@ -19,6 +19,7 @@ import {getExtensionSetting, SettingName} from '../utils/settings'
 import {Utils} from '../utils/utils'
 import {TestItemFactory} from '../test-info/test-item-factory'
 import {DocumentTestItem, LanguageToolManager} from '../language-tools/manager'
+import {SyncHintDecorationsManager} from './decorator'
 
 @Injectable()
 export class TestResolver implements OnModuleInit, vscode.Disposable {
@@ -31,7 +32,10 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
   private readonly languageToolManager: LanguageToolManager
   @Inject(PRIMARY_OUTPUT_CHANNEL_TOKEN)
   private readonly outputChannel: vscode.OutputChannel
+  @Inject(SyncHintDecorationsManager)
+  private readonly syncHint: SyncHintDecorationsManager
   private repoRoot: string | null
+  private openDocumentWatcherEnabled = false
 
   onModuleInit() {
     this.ctx.subscriptions.push(this)
@@ -188,6 +192,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     const buildFileName = getExtensionSetting(SettingName.BUILD_FILE_NAME)
     parentTest.children.replace([])
     this.store.clearTargetIdentifiers()
+    this.store.knownFiles.clear()
 
     result.targets.forEach(target => {
       if (!target.capabilities.canTest) return
@@ -256,6 +261,8 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       await this.expandTargetsForDocument(doc)
     }
 
+    if (this.openDocumentWatcherEnabled) return
+    this.openDocumentWatcherEnabled = true
     this.ctx.subscriptions.push(
       vscode.workspace.onDidOpenTextDocument(async doc => {
         // Discovery within newly opened documents.
@@ -296,30 +303,34 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
         cancellable: true,
       },
       async (progress, token) => {
-        result = await conn.sendRequest(
-          bsp.BuildTargetInverseSources.type,
-          params,
-          token
-        )
+        try {
+          result = await conn.sendRequest(
+            bsp.BuildTargetInverseSources.type,
+            params,
+            token
+          )
+        } catch (e) {
+          result = undefined
+        }
       }
     )
 
     if (!result) {
-      // TODO(IDE-1203): Add more guidance to update their sync scope.
-      this.outputChannel.appendLine(`Target not in scope for ${doc.fileName}.`)
+      this.outputChannel.appendLine(
+        `Unable to determine target for ${doc.fileName}.`
+      )
       return
     }
 
     for (const target of result.targets) {
+      // Put this file under the first matching target, in the rare event that a test is part of multiple targets.
       const targetItem = this.store.getTargetIdentifier(target)
       if (targetItem) {
         await this.resolveHandler(targetItem)
-      } else {
-        this.outputChannel.appendLine(
-          `Couldn't find a matching test item for ${target.uri}.`
-        )
+        return
       }
     }
+    this.syncHint.enable(doc.uri, this.repoRoot ?? '', docInfo)
   }
 
   /**
@@ -377,6 +388,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
           source
         )
         this.store.knownFiles.add(source.uri)
+        this.syncHint.disable(newTest.uri!)
 
         relevantParent.children.add(newTest)
         allDocumentTestItems.push(newTest)

@@ -21,6 +21,7 @@ import {ConnectionDetailsParser} from '../../server/connection-details'
 import {TestItemFactory} from '../../test-info/test-item-factory'
 import {CoverageTracker} from '../../coverage-utils/coverage-tracker'
 import {LanguageToolManager} from '../../language-tools/manager'
+import {SyncHintDecorationsManager} from '../../test-explorer/decorator'
 
 suite('Test Runner Factory', () => {
   let ctx: vscode.ExtensionContext
@@ -31,7 +32,10 @@ suite('Test Runner Factory', () => {
   const sandbox = sinon.createSandbox()
 
   beforeEach(async () => {
-    ctx = {subscriptions: []} as unknown as vscode.ExtensionContext
+    ctx = {
+      subscriptions: [],
+      asAbsolutePath: (relativePath: string) => `/sample/${relativePath}`,
+    } as unknown as vscode.ExtensionContext
     const moduleRef = await Test.createTestingModule({
       providers: [
         outputChannelProvider,
@@ -46,6 +50,7 @@ suite('Test Runner Factory', () => {
         TestItemFactory,
         CoverageTracker,
         LanguageToolManager,
+        SyncHintDecorationsManager,
       ],
     })
       .useMocker(token => {
