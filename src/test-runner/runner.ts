@@ -11,6 +11,7 @@ import {MessageConnection} from 'vscode-jsonrpc'
 import {TestRunTracker} from './run-tracker'
 import {RunTrackerFactory} from './run-factory'
 import {CoverageTracker} from '../coverage-utils/coverage-tracker'
+import {getExtensionSetting, SettingName} from '../utils/settings'
 
 @Injectable()
 export class TestRunner implements OnModuleInit, vscode.Disposable {
@@ -53,6 +54,17 @@ export class TestRunner implements OnModuleInit, vscode.Disposable {
     this.runProfiles.set(vscode.TestRunProfileKind.Coverage, coverageRunProfile)
     coverageRunProfile.loadDetailedCoverage =
       this.coverageTracker.loadDetailedCoverage.bind(this.coverageTracker)
+
+    // Debug run profile, added only when enabled.
+    if (getExtensionSetting(SettingName.DEBUG_ENABLED)) {
+      const debugRunProfile =
+        this.testCaseStore.testController.createRunProfile(
+          'Run with Debug',
+          vscode.TestRunProfileKind.Debug,
+          this.runHandler.bind(this)
+        )
+      this.runProfiles.set(vscode.TestRunProfileKind.Debug, debugRunProfile)
+    }
   }
 
   private async runHandler(

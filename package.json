@@ -79,6 +79,23 @@
           "type": "boolean",
           "default": "true",
           "description": "Find all tests within open files, without waiting for the file's target to be expanded in the Test Explorer."
+        },
+        "bazelbsp.debug.enabled": {
+          "type": "boolean",
+          "default": "false",
+          "markdownDescription": "Enable debugging integration in the Test Explorer.  This adds an additional Debug run profile for each test item.\nSet the bazelFlags, profileName, and readyPattern settings in this section to match your repo's required behavior."
+        },
+        "bazelbsp.debug.bazelFlags": {
+          "type": "array",
+          "description": "Flags to be added when debugging a target. Include any flags needed to ensure Bazel builds and runs the target in debug mode."
+        },
+        "bazelbsp.debug.readyPattern": {
+          "type": "string",
+          "description": "Regex pattern in the console output that signals that the target is ready for a debugger to connect. Once this is seen, the configured launch configuration will be triggered."
+        },
+        "bazelbsp.debug.launchConfigName": {
+          "type": "string",
+          "description": "Name of launch configuration that will be executed to begin the DAP debugging session. This must be a valid launch configuration in the launch.json file, workspace, or contributed by another extension."
         }
       }
     }

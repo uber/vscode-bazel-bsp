@@ -25,6 +25,7 @@ import {CoverageTracker} from '../../coverage-utils/coverage-tracker'
 import {LanguageToolManager} from '../../language-tools/manager'
 import {TestFinishDataKind} from '../../bsp/bsp-ext'
 import {BaseLanguageTools} from '../../language-tools/base'
+import * as settings from '../../utils/settings'
 
 suite('Test Run Tracker', () => {
   let testRunner: TestRunTracker
@@ -34,6 +35,14 @@ suite('Test Run Tracker', () => {
   let runSpy: sinon.SinonSpiedInstance<vscode.TestRun>
   let cancelTokenSource: vscode.CancellationTokenSource
   let languageToolStub: sinon.SinonStubbedInstance<LanguageToolManager>
+  let coverageTracker: CoverageTracker
+  let settingsStub: sinon.SinonStub
+
+  const fakeLaunchConfig: vscode.DebugConfiguration = {
+    type: 'node',
+    request: 'connect',
+    name: 'myLaunchConfig',
+  }
 
   const sandbox = sinon.createSandbox()
 
@@ -43,6 +52,20 @@ suite('Test Run Tracker', () => {
       'testRunTracker',
       'testRunTracker'
     )
+
+    settingsStub = sandbox.stub(settings, 'getExtensionSetting')
+
+    // Make fakeLaunchConfig available via configurations api.
+    const configurationsStub = sandbox.stub()
+    configurationsStub.withArgs('configurations').returns([fakeLaunchConfig])
+    const launchConfigurationsStub = sandbox.stub(
+      vscode.workspace,
+      'getConfiguration'
+    )
+    launchConfigurationsStub
+      .withArgs('launch')
+      .returns({get: configurationsStub})
+
     createdTestItems = []
 
     const createTestItems = (parent: vscode.TestItem | undefined, items) => {
@@ -82,7 +105,7 @@ suite('Test Run Tracker', () => {
     cancelTokenSource = new vscode.CancellationTokenSource()
 
     const run = testController.createTestRun(request)
-    const coverageTracker = new CoverageTracker()
+    coverageTracker = new CoverageTracker()
 
     languageToolStub = sandbox.createStubInstance(LanguageToolManager)
     const languageToolsInstance = sinon.createStubInstance(BaseLanguageTools)
@@ -423,5 +446,158 @@ suite('Test Run Tracker', () => {
         .filter(call => call.args[0].includes('\n\r')).length,
       1
     )
+  })
+
+  test('debug session, successful launch', async () => {
+    // Debug enabled in this test case, and valid settings present.
+    settingsStub
+      .withArgs(settings.SettingName.DEBUG_ENABLED)
+      .returns(true)
+      .withArgs(settings.SettingName.LAUNCH_CONFIG_NAME)
+      .returns('myLaunchConfig')
+      .withArgs(settings.SettingName.DEBUG_READY_PATTERN)
+      .returns('^Ready to Debug')
+      .withArgs(settings.SettingName.DEBUG_BAZEL_FLAGS)
+      .returns(['--my_flag_1', '--my_flag_2'])
+
+    const startDebuggingStub = sandbox
+      .stub(vscode.debug, 'startDebugging')
+      .resolves(true)
+
+    // Set up test run tracker configured in debug mode.
+    const debugRunProfile = testController.createRunProfile(
+      'sample',
+      vscode.TestRunProfileKind.Debug,
+      () => {}
+    )
+    const request = new vscode.TestRunRequest([], [], debugRunProfile)
+    const run = testController.createTestRun(request)
+    runSpy = sandbox.spy(run)
+
+    // New TestRunTracker with the debug run profile.
+    const testRunnerWithDebug = new TestRunTracker({
+      testCaseMetadata: metadata,
+      run: run,
+      request: request,
+      originName: 'sample',
+      cancelToken: cancelTokenSource.token,
+      languageToolManager: languageToolStub,
+      coverageTracker: coverageTracker,
+    })
+
+    // Send sample messages.
+    const sampleMessages: LogMessageParams[] = [
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'sample log message',
+      },
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'Ready to Debug on port 5000', // Matches debug readiness pattern in sample settings.
+      },
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'sample log message3',
+      },
+    ]
+
+    for (const params of sampleMessages) {
+      testRunnerWithDebug.onBuildLogMessage(params)
+    }
+
+    // Call for each message, plus newline sequences and debug start message.
+    assert.equal(runSpy.appendOutput.callCount, 7)
+    assert.equal(
+      runSpy.appendOutput
+        .getCalls()
+        .filter(call => call.args[0].includes('Starting remote debug session'))
+        .length,
+      1
+    )
+
+    // Ensure that debug session is started with correct launch config.
+    assert.strictEqual(startDebuggingStub.callCount, 1)
+    sinon.assert.calledWithExactly(
+      startDebuggingStub,
+      vscode.workspace.workspaceFolders?.[0],
+      fakeLaunchConfig
+    )
+  })
+
+  test('debug session, invalid launch config', async () => {
+    // Debug enabled in this test case, and valid settings present.
+    settingsStub
+      .withArgs(settings.SettingName.DEBUG_ENABLED)
+      .returns(true)
+      .withArgs(settings.SettingName.LAUNCH_CONFIG_NAME)
+      .returns('otherLaunchConfig') // Not available in the stubbed list of configurations.
+      .withArgs(settings.SettingName.DEBUG_READY_PATTERN)
+      .returns('^Ready to Debug')
+      .withArgs(settings.SettingName.DEBUG_BAZEL_FLAGS)
+      .returns(['--my_flag_1', '--my_flag_2'])
+
+    const startDebuggingStub = sandbox
+      .stub(vscode.debug, 'startDebugging')
+      .resolves(true)
+
+    // Set up test run tracker configured in debug mode.
+    const debugRunProfile = testController.createRunProfile(
+      'sample',
+      vscode.TestRunProfileKind.Debug,
+      () => {}
+    )
+    const request = new vscode.TestRunRequest([], [], debugRunProfile)
+    const run = testController.createTestRun(request)
+    runSpy = sandbox.spy(run)
+
+    // New TestRunTracker with the debug run profile.
+    const testRunnerWithDebug = new TestRunTracker({
+      testCaseMetadata: metadata,
+      run: run,
+      request: request,
+      originName: 'sample',
+      cancelToken: cancelTokenSource.token,
+      languageToolManager: languageToolStub,
+      coverageTracker: coverageTracker,
+    })
+
+    // Send sample messages.
+    const sampleMessages: LogMessageParams[] = [
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'sample log message',
+      },
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'Ready to Debug on port 5000', // Matches debug readiness pattern in sample settings.
+      },
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'sample log message3',
+      },
+    ]
+
+    for (const params of sampleMessages) {
+      testRunnerWithDebug.onBuildLogMessage(params)
+    }
+
+    // Call for each message, plus newline sequences and invalid setting message.
+    assert.equal(runSpy.appendOutput.callCount, 8)
+    assert.equal(
+      runSpy.appendOutput
+        .getCalls()
+        .filter(call => call.args[0].includes('Unable to find debug profile'))
+        .length,
+      1
+    )
+
+    // Debug session won't be started automatically.
+    assert.strictEqual(startDebuggingStub.callCount, 0)
   })
 })

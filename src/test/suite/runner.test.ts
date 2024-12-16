@@ -30,6 +30,7 @@ import {TestItemFactory} from '../../test-info/test-item-factory'
 import {CoverageTracker} from '../../coverage-utils/coverage-tracker'
 import {LanguageToolManager} from '../../language-tools/manager'
 import {SyncHintDecorationsManager} from '../../test-explorer/decorator'
+import * as settings from '../../utils/settings'
 
 suite('Test Runner', () => {
   let ctx: vscode.ExtensionContext
@@ -91,6 +92,7 @@ suite('Test Runner', () => {
     for (const item of ctx.subscriptions) {
       item.dispose()
     }
+    sandbox.restore()
   })
 
   test('onModuleInit', async () => {
@@ -159,6 +161,96 @@ suite('Test Runner', () => {
       assert.ok(callArgs[1].data.coverage)
       assert.strictEqual(callArgs[1].dataKind, TestParamsDataKind.BazelTest)
     }
+  })
+
+  test('Test Run with Debug, Valid Settings', async () => {
+    // Debug enabled and valid settings present.
+    const settingsStub: sinon.SinonStub = sandbox.stub(
+      settings,
+      'getExtensionSetting'
+    )
+    settingsStub
+      .withArgs(settings.SettingName.DEBUG_ENABLED)
+      .returns(true)
+      .withArgs(settings.SettingName.LAUNCH_CONFIG_NAME)
+      .returns('myLaunchConfig')
+      .withArgs(settings.SettingName.DEBUG_READY_PATTERN)
+      .returns('^Ready to Debug')
+      .withArgs(settings.SettingName.DEBUG_BAZEL_FLAGS)
+      .returns(['--my_flag_1', '--my_flag_2'])
+
+    // Launch configuration that matches setting above.
+    const fakeLaunchConfig: vscode.DebugConfiguration = {
+      type: 'node',
+      request: 'connect',
+      name: 'myLaunchConfig',
+    }
+    const configurationsStub = sandbox.stub()
+    configurationsStub.withArgs('configurations').returns([fakeLaunchConfig])
+    const launchConfigurationsStub = sandbox.stub(
+      vscode.workspace,
+      'getConfiguration'
+    )
+    launchConfigurationsStub
+      .withArgs('launch')
+      .returns({get: configurationsStub})
+
+    // Mock the connection to return a test result.
+    const sampleResult: bsp.TestResult = {
+      statusCode: bsp.StatusCode.Ok,
+    }
+    const connStub = sinon
+      .stub(sampleConn, 'sendRequest')
+      .returns(Promise.resolve(sampleResult))
+
+    // Ensure run profile creation.
+    await testRunner.onModuleInit()
+    const runProfile = testRunner.runProfiles.get(
+      vscode.TestRunProfileKind.Debug
+    )
+    assert.ok(runProfile)
+
+    // Ensure proper test run execution with configured Bazel flags.
+    const requestedTestItems: TestItem[] = []
+    testCaseStore.testController.items.forEach(item => {
+      requestedTestItems.push(item)
+    })
+    await runProfile.runHandler(
+      {
+        include: requestedTestItems,
+        exclude: [],
+        profile: runProfile,
+        preserveFocus: false,
+      },
+      new vscode.CancellationTokenSource().token
+    )
+
+    assert.equal(connStub.callCount, 3)
+    for (const callArgs of connStub.args) {
+      assert.ok(!callArgs[1].data.coverage)
+      assert.strictEqual(
+        callArgs[1].data.additionalBazelParams,
+        '--my_flag_1 --my_flag_2'
+      )
+      assert.strictEqual(callArgs[1].dataKind, TestParamsDataKind.BazelTest)
+    }
+  })
+
+  test('Test Run with Debug, Disabled', async () => {
+    // Debug disabled.
+    const settingsStub: sinon.SinonStub = sandbox.stub(
+      settings,
+      'getExtensionSetting'
+    )
+    settingsStub.withArgs(settings.SettingName.DEBUG_ENABLED).returns(false)
+
+    // Ensure that no debug run profile gets created.
+    await testRunner.onModuleInit()
+    const runProfile = testRunner.runProfiles.get(
+      vscode.TestRunProfileKind.Debug
+    )
+    assert.strictEqual(runProfile, undefined)
+    assert.strictEqual(settingsStub.callCount, 1)
   })
 
   test('Test Run with Cancel', async () => {
