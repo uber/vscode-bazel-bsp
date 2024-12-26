@@ -9,6 +9,10 @@ export enum SettingName {
   BAZEL_BINARY_PATH = 'bazelBinaryPath',
   SERVER_INSTALL_MODE = 'serverInstallMode',
   AUTO_EXPAND_TARGET = 'autoExpandTarget',
+  DEBUG_ENABLED = 'debug.enabled',
+  DEBUG_BAZEL_FLAGS = 'debug.bazelFlags',
+  LAUNCH_CONFIG_NAME = 'debug.launchConfigName',
+  DEBUG_READY_PATTERN = 'debug.readyPattern',
 }
 
 export interface SettingTypes {
@@ -18,6 +22,10 @@ export interface SettingTypes {
   [SettingName.BAZEL_BINARY_PATH]: string
   [SettingName.SERVER_INSTALL_MODE]: string
   [SettingName.AUTO_EXPAND_TARGET]: boolean
+  [SettingName.DEBUG_ENABLED]: boolean
+  [SettingName.DEBUG_BAZEL_FLAGS]: string[]
+  [SettingName.LAUNCH_CONFIG_NAME]: string
+  [SettingName.DEBUG_READY_PATTERN]: string
 }
 
 export function getExtensionSetting<T extends keyof SettingTypes>(

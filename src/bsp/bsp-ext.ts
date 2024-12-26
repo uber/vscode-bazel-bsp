@@ -19,6 +19,7 @@ export namespace TestParamsDataKind {
 export interface BazelTestParamsData {
   coverage?: boolean
   testFilter?: string
+  additionalBazelParams?: string
 }
 
 export namespace OnBuildPublishOutput {

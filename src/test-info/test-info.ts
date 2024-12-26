@@ -4,6 +4,7 @@ import {BuildTarget, TestParams, TestResult, StatusCode} from '../bsp/bsp'
 import {TestParamsDataKind, BazelTestParamsData} from '../bsp/bsp-ext'
 import {TestCaseStatus, TestRunTracker} from '../test-runner/run-tracker'
 import {DocumentTestItem, LanguageToolManager} from '../language-tools/manager'
+import {getExtensionSetting, SettingName} from '../utils/settings'
 
 export enum TestItemType {
   Root,
@@ -113,6 +114,16 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
       coverage:
         currentRun.getRunProfileKind() === vscode.TestRunProfileKind.Coverage,
     }
+
+    // Includes additional debug-specific flags when necessary.
+    if (currentRun.getRunProfileKind() === vscode.TestRunProfileKind.Debug) {
+      const configuredFlags = currentRun.getDebugBazelFlags()
+      if (configuredFlags && configuredFlags.length > 0) {
+        // Bazel BSP accepts whitespace separated list of flags.
+        bazelParams.additionalBazelParams = configuredFlags.join(' ')
+      }
+    }
+
     const params = {
       targets: [this.target.id],
       originId: currentRun.originName,

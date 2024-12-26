@@ -22,6 +22,7 @@ import {CoverageTracker} from '../coverage-utils/coverage-tracker'
 import {LanguageToolManager} from '../language-tools/manager'
 import {TaskEventTracker} from './task-events'
 import {ANSI_CODES} from '../utils/utils'
+import {getExtensionSetting, SettingName} from '../utils/settings'
 
 export enum TestCaseStatus {
   Pending,
@@ -44,6 +45,12 @@ export interface RunTrackerParams {
   languageToolManager: LanguageToolManager
 }
 
+type DebugInfo = {
+  debugFlags?: string[]
+  launchConfig?: vscode.DebugConfiguration
+  readyPattern?: RegExp
+}
+
 export class TestRunTracker implements TaskOriginHandlers {
   // All tests that are included in this run. See iterator definition below.
   private allTests: Map<TestItemType, TestCaseInfo[]>
@@ -63,6 +70,7 @@ export class TestRunTracker implements TaskOriginHandlers {
   private languageToolManager: LanguageToolManager
   private pending: Thenable<void>[] = []
   private buildTaskTracker: TaskEventTracker = new TaskEventTracker()
+  private debugInfo: DebugInfo | undefined
 
   constructor(params: RunTrackerParams) {
     this.allTests = new Map<TestItemType, TestCaseInfo[]>()
@@ -76,6 +84,7 @@ export class TestRunTracker implements TaskOriginHandlers {
     this.languageToolManager = params.languageToolManager
 
     this.prepareCurrentRun()
+    this.prepareDebugInfo()
   }
 
   public get originName(): string {
@@ -228,6 +237,21 @@ export class TestRunTracker implements TaskOriginHandlers {
       this.run.appendOutput(params.message)
       this.run.appendOutput('\n\r')
     }
+
+    // During debug runs, watch each message for indication of debug readiness.
+    // If the message matches the configured pattern, start the debug session.
+    if (
+      this.debugInfo?.launchConfig &&
+      this.debugInfo.readyPattern?.test(params.message)
+    ) {
+      this.run.appendOutput(
+        `Starting remote debug session [Launch config: '${this.debugInfo.launchConfig.name}']\r\n`
+      )
+      vscode.debug.startDebugging(
+        vscode.workspace.workspaceFolders?.[0],
+        this.debugInfo.launchConfig
+      )
+    }
   }
 
   /**
@@ -252,6 +276,10 @@ export class TestRunTracker implements TaskOriginHandlers {
 
   public getRunProfileKind(): vscode.TestRunProfileKind | undefined {
     return this.request.profile?.kind
+  }
+
+  public getDebugBazelFlags(): string[] | undefined {
+    return this.debugInfo?.debugFlags
   }
 
   /**
@@ -281,6 +309,72 @@ export class TestRunTracker implements TaskOriginHandlers {
         .mapTestCaseInfoToLookupKey(item)
       if (lookupKey) this.testsByLookupKey.set(lookupKey, item)
       if (item.target) this.buildTargets.set(item.target.id.uri, item.target)
+    }
+  }
+
+  /**
+   * During debug runs, this collects and stores the necessary settings that will be applied through this run.
+   * In the event that a setting is not found, information will be printed with the test output, but the run will still attempt to proceed.
+   */
+  private prepareDebugInfo() {
+    if (this.getRunProfileKind() !== vscode.TestRunProfileKind.Debug) {
+      return
+    }
+
+    // Determine configured launch configuration name.
+    const configName = getExtensionSetting(SettingName.LAUNCH_CONFIG_NAME)
+    if (!configName) {
+      this.run.appendOutput(
+        'No launch configuration name is configured. Debugger will not connect automatically for this run.\r\n'
+      )
+      this.run.appendOutput(
+        'Check the `bazelbsp.debug.profileName` VS Code setting to ensure it corresponds to a valid launch configuration.\r\n'
+      )
+      return
+    }
+
+    // Store the selected launch configuration.
+    const launchConfigurations = vscode.workspace.getConfiguration('launch')
+    const configurations =
+      launchConfigurations.get<any[]>('configurations') || []
+    const selectedConfig = configurations.find(
+      config => config.name !== undefined && config.name === configName
+    )
+    if (!selectedConfig) {
+      this.run.appendOutput(
+        `Unable to find debug profile ${configName}. Debugger will not connect automatically for this run.\r\n`
+      )
+      this.run.appendOutput(
+        'Check the `bazelbsp.debug.profileName` VS Code setting to ensure it corresponds to a valid launch configuration.\r\n'
+      )
+    }
+
+    // Ensure that matcher pattern is set for the output.
+    const readyPattern = getExtensionSetting(SettingName.DEBUG_READY_PATTERN)
+    if (!readyPattern) {
+      this.run.appendOutput(
+        'No matcher pattern is set. Debugger will not connect automatically for this run.\r\n'
+      )
+      this.run.appendOutput(
+        'Check the `bazelbsp.debug.readyPattern` VS Code setting to ensure that a pattern is set.\r\n'
+      )
+    }
+
+    // Ensure that matcher pattern is set for the output.
+    let debugFlags = getExtensionSetting(SettingName.DEBUG_BAZEL_FLAGS)
+    if (!debugFlags) {
+      this.run.appendOutput(
+        'No additional debug-specific Bazel flags have been found for this run.\r\n'
+      )
+      this.run.appendOutput(
+        'Check the `bazelbsp.debug.bazelFlags` VS Code setting to ensure that necessary flags are set.\r\n'
+      )
+    }
+
+    this.debugInfo = {
+      debugFlags: debugFlags,
+      launchConfig: selectedConfig,
+      readyPattern: readyPattern ? new RegExp(readyPattern) : undefined,
     }
   }
 
