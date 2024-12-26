@@ -11,6 +11,7 @@ import {ConnectionDetailsParser} from './connection-details'
 import {Utils} from '../utils/utils'
 import {INSTALL_BSP_COMMAND} from './install'
 import {BspConnectionDetails} from '../bsp/bsp'
+import {getExtensionSetting, SettingName} from '../utils/settings'
 
 export const CANCEL_ERROR_CODE = -32603
 const SERVER_NAME = 'bazelbsp'
@@ -96,8 +97,10 @@ export class BuildServerManager implements vscode.Disposable, OnModuleInit {
         SERVER_NAME,
         rootDir
       )
-
-    if (connDetails) {
+    const configuredVersion = getExtensionSetting(
+      SettingName.BSP_SERVER_VERSION
+    )
+    if (connDetails && connDetails?.version === configuredVersion) {
       return connDetails
     }
 

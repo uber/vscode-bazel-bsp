@@ -166,7 +166,7 @@ export class BazelBSPInstaller {
       .join(' ')
 
     // Full install command including flags.
-    const installCommand = `"${coursierPath}" launch --jvm 11+ ${MAVEN_PACKAGE}:${config.serverVersion} -M ${INSTALL_METHOD} -- ${flagsString}`
+    const installCommand = `"${coursierPath}" launch --jvm openjdk:1.17.0 ${MAVEN_PACKAGE}:${config.serverVersion} -M ${INSTALL_METHOD} -- ${flagsString}`
 
     // Report progress in output channel.
     const installProcess = cp.spawn(installCommand, {cwd: root, shell: true})
