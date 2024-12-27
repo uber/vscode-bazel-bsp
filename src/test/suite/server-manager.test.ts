@@ -16,6 +16,7 @@ import {createSampleMessageConnection} from './test-utils'
 import {ConnectionDetailsParser} from '../../server/connection-details'
 import {Utils} from '../../utils/utils'
 import {BspConnectionDetails} from '../../bsp/bsp'
+import * as settings from '../../utils/settings'
 
 suite('Build Server', () => {
   let ctx: vscode.ExtensionContext
@@ -80,6 +81,8 @@ suite('Build Server', () => {
   })
 
   test('OnModuleInit', async () => {
+    sandbox.stub(settings, 'getExtensionSetting').returns('1.0.0')
+
     buildServer.onModuleInit()
     assert.equal(ctx.subscriptions.length, 1)
     const conn = await buildServer.getConnection()
@@ -88,6 +91,8 @@ suite('Build Server', () => {
   })
 
   test('ServerLaunch', async () => {
+    sandbox.stub(settings, 'getExtensionSetting').returns('1.0.0')
+
     const listenStub = sinon.stub(sampleConn, 'listen')
 
     buildServer.serverLaunch()
@@ -100,7 +105,28 @@ suite('Build Server', () => {
     assert.ok(conn)
   })
 
+  test('ServerLaunch, version upgrade', async () => {
+    sandbox.stub(settings, 'getExtensionSetting').returns('1.0.1')
+    const commandStub = sandbox
+      .stub(vscode.commands, 'executeCommand')
+      .resolves(true)
+
+    const listenStub = sinon.stub(sampleConn, 'listen')
+
+    buildServer.serverLaunch()
+    const conn = await buildServer.getConnection()
+
+    await appendLinePromise
+    assert.ok(commandStub.calledOnceWith('bazelbsp.install'))
+    assert.ok(appendLineStub.calledOnce)
+    assert.ok(spawnStub.calledOnce)
+    assert.ok(listenStub.calledOnce)
+    assert.ok(conn)
+  })
+
   test('Dispose', async () => {
+    sandbox.stub(settings, 'getExtensionSetting').returns('1.0.0')
+
     buildServer.serverLaunch()
     const conn = await buildServer.getConnection()
 

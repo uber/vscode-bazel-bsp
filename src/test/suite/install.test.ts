@@ -87,7 +87,7 @@ suite('BSP Installer', () => {
 
     // Just confirm that coursier path was part of the spawn call, to leave flexibility for other changes to the command.
     assert.ok(spawnStub.getCalls()[0].args[0].includes(coursierPath))
-    assert.ok(spawnStub.getCalls()[0].args[0].includes('--jvm 11+'))
+    assert.ok(spawnStub.getCalls()[0].args[0].includes('--jvm openjdk:1.17.0'))
     assert.ok(installResult)
   })
 
