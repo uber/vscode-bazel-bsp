@@ -70,3 +70,19 @@ export interface JUnitStyleTestCaseData {
   fullError?: string
   errorType?: string
 }
+
+export interface InitializeBuildData {
+  clientClassesRootDir?: string
+  openTelemetryEndpoint?: string
+  featureFlags?: FeatureFlags
+}
+
+export interface FeatureFlags {
+  isPythonSupportEnabled?: boolean
+  isAndroidSupportEnabled?: boolean
+  isGoSupportEnabled?: boolean
+  isRustSupportEnabled?: boolean
+  isPropagateExportsFromDepsEnabled?: boolean
+  /** Bazel specific */
+  bazelSymlinksScanMaxDepth?: number
+}
