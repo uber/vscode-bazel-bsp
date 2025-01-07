@@ -52,7 +52,7 @@
         },
         "bazelbsp.serverVersion": {
           "type": "string",
-          "default": "3.2.0-20240606-167e699-NIGHTLY",
+          "default": "3.2.0-20250106-a42f8bf24-NIGHTLY",
           "description": "Version of the Bazel BSP server to install."
         },
         "bazelbsp.bazelBinaryPath": {

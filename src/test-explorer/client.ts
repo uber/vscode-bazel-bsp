@@ -198,6 +198,11 @@ export class BazelBSPBuildClient
     // Send initialize request to the server.
     try {
       const rootUri = Utils.getWorkspaceRoot()
+      const initData: bspExt.InitializeBuildData = {
+        featureFlags: {
+          isPythonSupportEnabled: true,
+        },
+      }
       const initResult = await conn.sendRequest(bsp.BuildInitialize.type, {
         displayName: 'VS Code Bazel BSP',
         version: pkg.version,
@@ -206,6 +211,7 @@ export class BazelBSPBuildClient
         capabilities: {
           languageIds: SUPPORTED_LANGUAGES,
         },
+        data: initData,
       })
 
       // Notify the build server that client initialization is complete.

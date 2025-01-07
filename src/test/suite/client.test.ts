@@ -105,6 +105,11 @@ suite('Build Client', () => {
     assert.ok(initRequest.args[1].capabilities)
     assert.ok(initRequest.args[1].rootUri)
     assert.ok(initRequest.args[1].version)
+    assert.deepStrictEqual(initRequest.args[1].data, {
+      featureFlags: {
+        isPythonSupportEnabled: true,
+      },
+    })
 
     // Check that initialization result has been sent to the server.
     assert.equal(initNotificationStub.callCount, 1)
