@@ -190,38 +190,31 @@ export class TestRunTracker implements TaskOriginHandlers {
 
     const testFinishData = params.data as TestFinish
     if (testFinishData.dataKind === TestFinishDataKind.JUnitStyleTestCaseData) {
-      const targetTestInfo = this.buildTaskTracker.getBuildTargetId(
-        params.taskId.id
-      )
-      if (!targetTestInfo) {
-        this.run.appendOutput(
-          `Updating ${testFinishData.displayName}: Unable to identify a build target for this result.\n`
-        )
-        return
+      // Workaround for missing target ID and parent task bug in bazel-bsp server (https://youtrack.jetbrains.com/issue/BAZEL-1585).
+      // For now, test runs that contain the same test case in multiple targets of the run will all use the same result.
+      let hasMatch = false
+      for (const target of this.buildTargets.values()) {
+        const key = this.languageToolManager
+          .getLanguageTools(target)
+          .mapTestFinishDataToLookupKey(testFinishData)
+
+        if (!key) {
+          continue
+        }
+
+        // Find the matching item and post the updated status.
+        const item = this.testsByLookupKey.get(key)
+        if (item) {
+          this.updateStatusFromTestFinishData(item, testFinishData)
+          hasMatch = true
+        }
       }
 
-      // Determine expected key for this set of testFinishData.
-      const target = this.buildTargets.get(targetTestInfo?.uri)
-      if (!target) {
-        this.run.appendOutput(
-          `Updating ${testFinishData.displayName}: Unable to find information stored for target ${targetTestInfo?.uri}.\n`
-        )
-        return
-      }
-      const key = this.languageToolManager
-        .getLanguageTools(target)
-        .mapTestFinishDataToLookupKey(testFinishData)
-
-      if (!key) {
+      if (!hasMatch) {
         this.run.appendOutput(
           `Updating ${testFinishData.displayName}: Unable to match this test result to an item in this run.\n`
         )
-        return
       }
-
-      // Find the matching item and post the updated status.
-      const item = this.testsByLookupKey.get(key)
-      if (item) this.updateStatusFromTestFinishData(item, testFinishData)
     }
   }
 

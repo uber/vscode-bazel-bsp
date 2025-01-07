@@ -350,13 +350,13 @@ suite('Test Run Tracker', () => {
       {
         start: {
           originId: 'sample',
-          taskId: {id: 'task2', parents: ['task1']},
+          taskId: {id: 'task2', parents: []},
           message: 'task1 started',
           dataKind: TaskStartDataKind.TestStart,
         },
         finish: {
           originId: 'sample',
-          taskId: {id: 'task2', parents: ['task1']},
+          taskId: {id: 'task2', parents: []},
           status: StatusCode.Ok,
           message: 'task2 finished',
           dataKind: TaskFinishDataKind.TestFinish,
@@ -375,13 +375,13 @@ suite('Test Run Tracker', () => {
       {
         start: {
           originId: 'sample',
-          taskId: {id: 'task3', parents: ['task1']},
+          taskId: {id: 'task3', parents: []},
           message: 'task3 started',
           dataKind: TaskStartDataKind.TestStart,
         },
         finish: {
           originId: 'sample',
-          taskId: {id: 'task3', parents: ['task1']},
+          taskId: {id: 'task3', parents: []},
           status: StatusCode.Ok,
           message: 'task3 finished',
           dataKind: TaskFinishDataKind.TestFinish,
