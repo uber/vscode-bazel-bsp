@@ -77,12 +77,12 @@
         },
         "bazelbsp.autoExpandTarget": {
           "type": "boolean",
-          "default": "true",
+          "default": true,
           "description": "Find all tests within open files, without waiting for the file's target to be expanded in the Test Explorer."
         },
         "bazelbsp.debug.enabled": {
           "type": "boolean",
-          "default": "false",
+          "default": false,
           "markdownDescription": "Enable debugging integration in the Test Explorer.  This adds an additional Debug run profile for each test item.\nSet the bazelFlags, profileName, and readyPattern settings in this section to match your repo's required behavior."
         },
         "bazelbsp.debug.bazelFlags": {
