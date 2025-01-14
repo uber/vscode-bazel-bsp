@@ -136,7 +136,7 @@
     "@nestjs/common": "^10.3.3",
     "@nestjs/core": "^10.3.3",
     "@nestjs/testing": "^10.3.3",
-    "axios": "1.6.8",
+    "axios": "1.7.4",
     "esbuild": "^0.20.2",
     "reflect-metadata": "^0.2.1",
     "semver": "^7.6.0",
