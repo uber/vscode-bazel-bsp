@@ -1,5 +1,5 @@
 {
-  "name": "vscode-bazel-bsp",
+  "name": "@uber/vscode-bazel-bsp",
   "displayName": "Bazel Build Server Protocol (BSP)",
   "description": "Bazel BSP integration for VS Code.",
   "publisher": "Uber",
@@ -101,7 +101,7 @@
     }
   },
   "scripts": {
-    "package": "vsce package --yarn",
+    "package": "cp package.json package.bkp.json && jq '.name=\"vscode-bazel-bsp\"' package.bkp.json > package.json && vsce package --yarn && mv package.bkp.json package.json",
     "vscode:prepublish": "npm run esbuild-base -- --minify",
     "compile": "yarn run esbuild-base -- --sourcemap",
     "test-compile": "tsc -p ./",
