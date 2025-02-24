@@ -4,8 +4,8 @@ import * as path from 'path'
 import * as os from 'os'
 import * as axios from 'axios'
 import * as vscode from 'vscode'
+import * as zlib from 'zlib'
 import {Inject} from '@nestjs/common'
-
 import {Utils} from '../utils/utils'
 import {
   EXTENSION_CONTEXT_TOKEN,
@@ -21,7 +21,13 @@ export const INSTALL_BSP_COMMAND = 'bazelbsp.install'
 
 const MAVEN_PACKAGE = 'org.jetbrains.bsp:bazel-bsp'
 const INSTALL_METHOD = 'org.jetbrains.bsp.bazel.install.Install'
-const COURSIER_URL = 'https://git.io/coursier-cli'
+const COURSIER_URL_DEFAULT = 'https://git.io/coursier-cli'
+const COURSIER_URL_APPLE_SILICON =
+  'https://github.com/coursier/coursier/releases/latest/download/cs-aarch64-apple-darwin.gz'
+const COURSIER_URL_APPLE_INTEL =
+  'https://github.com/coursier/launchers/raw/master/cs-x86_64-apple-darwin.gz'
+const OPEN_JDK_JAVA_17 = 'openjdk:1.17.0'
+const TEMURIN_JAVA_17 = 'temurin:1.17.0.0'
 
 export interface InstallConfig {
   bazelProjectFilePath: string
@@ -121,13 +127,30 @@ export class BazelBSPInstaller {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'coursier-'))
     const coursierPath = path.join(tempDir, 'coursier')
 
-    this.outputChannel.appendLine(`Downloading Coursier from ${COURSIER_URL}`)
+    let coursierUrl: string
+    coursierUrl =
+      os.platform() === 'darwin'
+        ? os.arch() === 'arm64'
+          ? COURSIER_URL_APPLE_SILICON
+          : COURSIER_URL_APPLE_INTEL
+        : COURSIER_URL_DEFAULT
+
+    this.outputChannel.appendLine(`Downloading Coursier from ${coursierUrl}`)
+
     try {
-      const response = await axios.default.get(COURSIER_URL, {
+      const response = await axios.default.get(coursierUrl, {
         responseType: 'arraybuffer',
       })
 
-      await fs.writeFile(coursierPath, response.data)
+      let fileData = response.data
+
+      // Decompress if downloading a gzipped file
+      if (coursierUrl.endsWith('.gz')) {
+        this.outputChannel.appendLine('Using gzipped Coursier')
+        fileData = await this.gunzip(fileData)
+      }
+
+      await fs.writeFile(coursierPath, fileData)
       await fs.chmod(coursierPath, 0o755)
     } catch (e) {
       this.outputChannel.appendLine(`Failed to download Coursier: ${e}`)
@@ -168,8 +191,10 @@ export class BazelBSPInstaller {
       .map(([key, value]) => `${key} "${value}"`)
       .join(' ')
 
-    // Full install command including flags.
-    const installCommand = `"${coursierPath}" launch --jvm openjdk:1.17.0 ${MAVEN_PACKAGE}:${config.serverVersion} -M ${INSTALL_METHOD} -- ${flagsString}`
+    const javaVersion =
+      os.platform() === 'darwin' ? TEMURIN_JAVA_17 : OPEN_JDK_JAVA_17
+    this.outputChannel.appendLine(`Using Java version: ${javaVersion}`)
+    const installCommand = `"${coursierPath}" launch --jvm ${javaVersion} ${MAVEN_PACKAGE}:${config.serverVersion} -M ${INSTALL_METHOD} -- ${flagsString}`
 
     // Report progress in output channel.
     const installProcess = cp.spawn(installCommand, {cwd: root, shell: true})
@@ -276,5 +301,14 @@ export class BazelBSPInstaller {
         `Failed to write updated Python aspect to ${targetFile}. Skipping patch.`
       )
     }
+  }
+
+  private async gunzip(data: Buffer): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      zlib.gunzip(data, (err, result) => {
+        if (err) reject(err)
+        else resolve(result)
+      })
+    })
   }
 }
