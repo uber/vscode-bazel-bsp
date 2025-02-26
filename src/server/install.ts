@@ -4,7 +4,6 @@ import * as path from 'path'
 import * as os from 'os'
 import * as axios from 'axios'
 import * as vscode from 'vscode'
-import * as zlib from 'zlib'
 import {Inject} from '@nestjs/common'
 import {Utils} from '../utils/utils'
 import {
@@ -147,7 +146,7 @@ export class BazelBSPInstaller {
       // Decompress if downloading a gzipped file
       if (coursierUrl.endsWith('.gz')) {
         this.outputChannel.appendLine('Using gzipped Coursier')
-        fileData = await this.gunzip(fileData)
+        fileData = await Utils.gunzip(fileData)
       }
 
       await fs.writeFile(coursierPath, fileData)
@@ -301,14 +300,5 @@ export class BazelBSPInstaller {
         `Failed to write updated Python aspect to ${targetFile}. Skipping patch.`
       )
     }
-  }
-
-  private async gunzip(data: Buffer): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      zlib.gunzip(data, (err, result) => {
-        if (err) reject(err)
-        else resolve(result)
-      })
-    })
   }
 }

@@ -8,6 +8,8 @@ import * as bsp from '../../bsp/bsp'
 import * as axios from 'axios'
 import fs from 'fs/promises'
 import cp from 'child_process'
+import * as zlib from 'zlib'
+const proxyquire = require('proxyquire')
 
 import {BazelBSPBuildClient} from '../../test-explorer/client'
 import {
@@ -29,34 +31,22 @@ suite('BSP Installer', () => {
   let sampleConn: MessageConnection
   let clientOutputChannel: vscode.LogOutputChannel
   let spawnStub: sinon.SinonStub
+  let osMock: any
 
   const sandbox = sinon.createSandbox()
 
-  beforeEach(async () => {
-    let process = cp.spawn('echo')
-    spawnStub = sandbox.stub(cp, 'spawn').returns(process)
+  interface InstallTestConfig {
+    platform: string
+    arch: string
+    isGzipped: boolean
+    javaVersion: string
+  }
 
-    // Return a fixed workspace root to avoid impact of local environment.
-    sandbox.stub(Utils, 'getWorkspaceGitRoot').resolves('/repo/root')
+  const setupInstallTest = (config: InstallTestConfig) => {
+    // Set up OS mock values
+    osMock.platform = () => config.platform
+    osMock.arch = () => config.arch
 
-    // Set up the testing app which includes injected dependnecies and the stubbed BuildServerManager
-    ctx = {subscriptions: []} as unknown as vscode.ExtensionContext
-    const moduleRef = await Test.createTestingModule({
-      providers: [
-        outputChannelProvider,
-        contextProviderFactory(ctx),
-        BazelBSPInstaller,
-      ],
-    }).compile()
-    bazelBSPInstaller = moduleRef.get(BazelBSPInstaller)
-  })
-
-  afterEach(() => {
-    sandbox.restore()
-  })
-
-  test('spawn install process', async () => {
-    // User selection to install BSP
     sandbox
       .stub(vscode.window, 'showErrorMessage')
       .resolves({title: 'Install BSP'})
@@ -80,29 +70,111 @@ load("@rules_python//python:defs.bzl", "PyInfo", "PyRuntimeInfo")
 load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_location")`
     )
 
-    // Simulated data returned by coursier download request.
-    const sampleData = 'sample data'
-    sandbox.stub(axios.default, 'get').resolves({data: sampleData} as any)
+    const originalData = 'sample data'
+    const responseData = config.isGzipped
+      ? zlib.gzipSync(Buffer.from(originalData))
+      : originalData
 
-    const writeFileSpy = sandbox.spy(fs, 'writeFile')
-    const installResult = await bazelBSPInstaller.install()
+    sandbox.stub(axios.default, 'get').resolves({
+      data: responseData,
+    } as any)
 
-    // Confirm that the coursier data was written to a file.
-    const coursierPath = writeFileSpy.getCalls()[0].args[0]
-    const writtenData = writeFileSpy.getCalls()[0].args[1]
-    assert.equal(writtenData, sampleData)
-    assert.equal(spawnStub.callCount, 1)
+    return {originalData}
+  }
 
-    // Just confirm that coursier path was part of the spawn call, to leave flexibility for other changes to the command.
-    assert.ok(spawnStub.getCalls()[0].args[0].includes(coursierPath))
-    assert.ok(spawnStub.getCalls()[0].args[0].includes('--jvm openjdk:1.17.0'))
-    assert.ok(installResult)
+  beforeEach(async () => {
+    let process = cp.spawn('echo')
+    spawnStub = sandbox.stub(cp, 'spawn').returns(process)
+    sandbox.stub(Utils, 'getWorkspaceGitRoot').resolves('/repo/root')
 
-    const updatedContents = writeFileSpy.getCalls()[1].args[1]
-    const expectedContents = `load("@rules_python//python:defs.bzl", "PyInfo", "PyRuntimeInfo")
+    osMock = {
+      platform: () => 'darwin',
+      arch: () => 'arm64',
+    }
 
+    // Use proxyquire to inject the OS mock
+    const BazelBSPInstallerProxy = proxyquire('../../server/install', {
+      os: osMock,
+    }).BazelBSPInstaller
+
+    ctx = {subscriptions: []} as unknown as vscode.ExtensionContext
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        outputChannelProvider,
+        contextProviderFactory(ctx),
+        {
+          provide: BazelBSPInstaller,
+          useClass: BazelBSPInstallerProxy,
+        },
+      ],
+    }).compile()
+    bazelBSPInstaller = moduleRef.get(BazelBSPInstaller)
+  })
+
+  afterEach(() => {
+    sandbox.restore()
+  })
+
+  const testConfigs: {[key: string]: InstallTestConfig} = {
+    macArm64: {
+      platform: 'darwin',
+      arch: 'arm64',
+      isGzipped: true,
+      javaVersion: 'temurin:1.17.0.0',
+    },
+    macIntel: {
+      platform: 'darwin',
+      arch: 'x64',
+      isGzipped: true,
+      javaVersion: 'temurin:1.17.0.0',
+    },
+    linux: {
+      platform: 'linux',
+      arch: 'x64',
+      isGzipped: false,
+      javaVersion: 'openjdk:1.17.0',
+    },
+  }
+
+  Object.entries(testConfigs).forEach(([name, config]) => {
+    test(`spawn install process - ${name}`, async () => {
+      const {originalData} = setupInstallTest(config)
+
+      const writeFileSpy = sandbox.spy(fs, 'writeFile')
+      const chmodSpy = sandbox.spy(fs, 'chmod')
+      const installResult = await bazelBSPInstaller.install()
+
+      // Verify coursier download and permissions
+      assert.equal(writeFileSpy.callCount, 1)
+      const coursierPath = writeFileSpy.getCalls()[0].args[0]
+      const writtenData = writeFileSpy.getCalls()[0].args[1]
+
+      if (config.isGzipped) {
+        assert.equal(writtenData.toString(), originalData)
+      } else {
+        assert.equal(writtenData, originalData)
+      }
+
+      assert.equal(chmodSpy.callCount, 1)
+      assert.equal(chmodSpy.getCalls()[0].args[0], coursierPath)
+      assert.equal(chmodSpy.getCalls()[0].args[1], 0o755)
+
+      // Verify spawn command
+      const updatedContents = writeFileSpy.getCalls()[1].args[1]
+      const expectedContents = `load("@rules_python//python:defs.bzl", "PyInfo", "PyRuntimeInfo")
 load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_location")`
-    assert.equal(updatedContents, expectedContents)
+      assert.equal(updatedContents, expectedContents)
+      assert.equal(spawnStub.callCount, 1)
+      const spawnCall = spawnStub.getCalls()[0]
+      assert.ok(spawnCall.args[0].includes(coursierPath))
+      assert.ok(spawnCall.args[0].includes(`--jvm ${config.javaVersion}`))
+      assert.ok(spawnCall.args[0].includes('org.jetbrains.bsp:bazel-bsp:2.0.0'))
+      assert.deepStrictEqual(spawnCall.args[1], {
+        cwd: '/repo/root',
+        shell: true,
+      })
+      assert.ok(installResult)
+    })
   })
 
   test('failed coursier download', async () => {
