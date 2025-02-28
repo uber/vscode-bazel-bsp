@@ -97,7 +97,7 @@ export class PythonLanguageTools
     }
 
     // Document symbols provided by Pylance.
-    const symbols: vscode.DocumentSymbol[] =
+    const symbols: vscode.DocumentSymbol[] | undefined =
       await vscode.commands.executeCommand(
         'vscode.executeDocumentSymbolProvider',
         document
@@ -161,8 +161,10 @@ export class PythonLanguageTools
     }
 
     // Start at top level and evaluate each symbol in the document.
-    for (const symbol of symbols) {
-      evaluateCurrentSymbol(symbol)
+    if (symbols) {
+      for (const symbol of symbols) {
+        evaluateCurrentSymbol(symbol)
+      }
     }
 
     const finalTestCases = result.filter(item => {

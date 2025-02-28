@@ -78,6 +78,16 @@ suite('Python Language Tools', () => {
     assert.equal(result.documentTest?.name, 'my_test.py')
   })
 
+  test('undefined symbols', async () => {
+    executeCommandStub.resolves(undefined)
+    const result = await languageTools.getDocumentTestCases(
+      vscode.Uri.parse('file:///repo/root/sample/my_test.py'),
+      '/repo/root/'
+    )
+    assert.strictEqual(result.isTestFile, true)
+    assert.strictEqual(result.testCases.length, 0)
+  })
+
   test('non test file', async () => {
     const result = await languageTools.getDocumentTestCases(
       vscode.Uri.parse('file:///repo/root/sample/my_file.py'),
