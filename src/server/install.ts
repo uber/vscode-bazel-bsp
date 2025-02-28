@@ -159,7 +159,7 @@ export class BazelBSPInstaller {
       // Set Bazel project details to be used if a project file is not already present.
       ['--project-view-file', config.bazelProjectFilePath],
       ['--bazel-binary', bazelPath],
-      ['--targets', '# //YOUR_TARGETS/...'],
+      ['--targets', '//your/targets/here/...'],
     ])
     const flagsString = Array.from(installFlags.entries())
       .map(([key, value]) => `${key} "${value}"`)
