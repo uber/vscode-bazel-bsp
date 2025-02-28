@@ -106,6 +106,9 @@ export class BazelBSPInstaller {
       this.outputChannel.show()
       return false
     }
+
+    // Temporary: Patch the python_info file to be compatible with rules_py.
+    await this.patchPythonAspect(root)
     return true
   }
 
@@ -233,6 +236,45 @@ export class BazelBSPInstaller {
       bazelProjectFilePath: projectFilePath,
       serverVersion: bazelBspVersion,
       bazelBinaryPath: bazelBinaryPath,
+    }
+  }
+
+  /**
+   * Temporary solution to ensure that the rules_python load statement is always included in the Python aspect.
+   * This is needed for compatibility with targets that no longer include the builtin Python providers (e.g. rules_py).
+   * This will be addressed by https://github.com/JetBrains/hirschgarten/pull/210 once we have a standalone version of the server back in place.
+   * @param root
+   */
+  private async patchPythonAspect(root: string) {
+    // Get the current contents of the Python aspect template, as added by the installer.
+    const targetFile = path.join(
+      root,
+      '.bazelbsp/aspects/rules/python/python_info.bzl.template'
+    )
+
+    let content = ''
+    try {
+      content = await fs.readFile(targetFile, 'utf8')
+    } catch {
+      this.outputChannel.appendLine(
+        `Failed to read file ${targetFile}. Skipping patch.`
+      )
+    }
+
+    // Make rules_python load statement non-conditional for compatibility with rules_py.
+    const regex =
+      /#if\( \$pythonEnabled == "true" && \$bazel8OrAbove == "true" \)[\s\S]*?#end/
+    const replacement =
+      'load("@rules_python//python:defs.bzl", "PyInfo", "PyRuntimeInfo")'
+
+    // Replace the matched block with the replacement.
+    content = content.replace(regex, replacement)
+    try {
+      await fs.writeFile(targetFile, content, 'utf8')
+    } catch (err) {
+      this.outputChannel.appendLine(
+        `Failed to write updated Python aspect to ${targetFile}. Skipping patch.`
+      )
     }
   }
 }
