@@ -29,7 +29,8 @@
       },
       {
         "command": "bazelbsp.openProjectView",
-        "title": "Bazel BSP: Open Project View File"
+        "title": "Bazel BSP: Open Project View File",
+        "shortTitle": "Select Project Targets"
       }
     ],
     "configuration": {
@@ -98,6 +99,15 @@
           "description": "Name of launch configuration that will be executed to begin the DAP debugging session. This must be a valid launch configuration in the launch.json file, workspace, or contributed by another extension."
         }
       }
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "bazelbsp.openProjectView",
+          "when": "view == 'workbench.view.testing'",
+          "group": "navigation"
+        }
+      ]
     }
   },
   "scripts": {
