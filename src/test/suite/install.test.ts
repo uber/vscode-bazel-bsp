@@ -72,6 +72,14 @@ suite('BSP Installer', () => {
       .withArgs(settings.SettingName.SERVER_INSTALL_MODE)
       .returns('Prompt')
 
+    sandbox.stub(fs, 'readFile').resolves(
+      `#if( $pythonEnabled == "true" && $bazel8OrAbove == "true" )
+load("@rules_python//python:defs.bzl", "PyInfo", "PyRuntimeInfo")
+#end
+
+load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_location")`
+    )
+
     // Simulated data returned by coursier download request.
     const sampleData = 'sample data'
     sandbox.stub(axios.default, 'get').resolves({data: sampleData} as any)
@@ -89,6 +97,12 @@ suite('BSP Installer', () => {
     assert.ok(spawnStub.getCalls()[0].args[0].includes(coursierPath))
     assert.ok(spawnStub.getCalls()[0].args[0].includes('--jvm openjdk:1.17.0'))
     assert.ok(installResult)
+
+    const updatedContents = writeFileSpy.getCalls()[1].args[1]
+    const expectedContents = `load("@rules_python//python:defs.bzl", "PyInfo", "PyRuntimeInfo")
+
+load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_location")`
+    assert.equal(updatedContents, expectedContents)
   })
 
   test('failed coursier download', async () => {
