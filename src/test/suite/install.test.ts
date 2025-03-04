@@ -162,8 +162,10 @@ load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_loc
       // Verify spawn command
       const updatedContents = writeFileSpy.getCalls()[1].args[1]
       const expectedContents = `load("@rules_python//python:defs.bzl", "PyInfo", "PyRuntimeInfo")
+
 load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_location")`
-      // assert.equal(updatedContents, expectedContents)
+
+      assert.equal(updatedContents, expectedContents)
       assert.equal(spawnStub.callCount, 1)
       const spawnCall = spawnStub.getCalls()[0]
       assert.ok(spawnCall.args[0].includes(coursierPath))
