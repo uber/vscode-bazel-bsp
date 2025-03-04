@@ -2,6 +2,7 @@ import * as vscode from 'vscode'
 import * as assert from 'assert'
 import sinon from 'sinon'
 import {afterEach} from 'mocha'
+import * as zlib from 'zlib'
 
 import {Deferred, Utils} from '../../utils/utils'
 
@@ -98,6 +99,25 @@ suite('Utils Test Suite', () => {
         `Scenario failed: ${scenario}`
       )
     })
+  })
+
+  test('gunzip successful decompression', async () => {
+    const originalData = 'Hello, World!'
+    const compressedData = zlib.gzipSync(Buffer.from(originalData))
+
+    const result = await Utils.gunzip(compressedData)
+    assert.strictEqual(result.toString(), originalData)
+  })
+
+  test('gunzip handles invalid data', async () => {
+    const invalidData = Buffer.from('not compressed data')
+
+    try {
+      await Utils.gunzip(invalidData)
+      assert.fail('Should have thrown an error')
+    } catch (error) {
+      assert.ok(error instanceof Error)
+    }
   })
 })
 

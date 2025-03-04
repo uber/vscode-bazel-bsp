@@ -3,6 +3,7 @@ import * as path from 'path'
 import {promisify} from 'util'
 import {exec} from 'child_process'
 import * as fs from 'fs/promises'
+import * as zlib from 'zlib'
 
 const execAsync = promisify(exec)
 
@@ -53,6 +54,15 @@ export class Utils {
       return null
     }
     return Utils.getGitRootFromPath(workspaceRoot.fsPath)
+  }
+
+  static async gunzip(data: Buffer): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      zlib.gunzip(data, (err, result) => {
+        if (err) reject(err)
+        else resolve(result)
+      })
+    })
   }
 
   // Use wrapped file i/o operations for use in stubbing.
