@@ -1,13 +1,13 @@
 {
   "extends": "./node_modules/gts/",
   "rules": {
-    "node/no-unpublished-import": 0,
-    "node/no-unpublished-require": 0,
-    "node/no-extraneous-import": 0,
+    "n/no-unpublished-import": 0,
+    "n/no-unpublished-require": 0,
+    "n/no-extraneous-import": 0,
+    "n/no-process-exit": 0,
     "eqeqeq": 0,
     "@typescript-eslint/no-explicit-any": 0,
     "@typescript-eslint/no-unused-vars": 0,
-    "prefer-const": 0,
-    "no-process-exit": 0
+    "prefer-const": 0
   }
 }
