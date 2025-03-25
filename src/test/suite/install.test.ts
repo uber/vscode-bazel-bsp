@@ -3,33 +3,23 @@ import * as vscode from 'vscode'
 import {Test} from '@nestjs/testing'
 import {beforeEach, afterEach} from 'mocha'
 import * as sinon from 'sinon'
-import {MessageConnection} from 'vscode-jsonrpc'
-import * as bsp from '../../bsp/bsp'
 import * as axios from 'axios'
 import fs from 'fs/promises'
 import cp from 'child_process'
 import * as zlib from 'zlib'
 const proxyquire = require('proxyquire')
 
-import {BazelBSPBuildClient} from '../../test-explorer/client'
 import {
   contextProviderFactory,
   outputChannelProvider,
 } from '../../custom-providers'
-import {BuildServerManager} from '../../server/server-manager'
 import {Utils} from '../../utils/utils'
-import {createSampleMessageConnection} from './test-utils'
 import {BazelBSPInstaller} from '../../server/install'
 import * as settings from '../../utils/settings'
-import {TestItemFactory} from '../../test-info/test-item-factory'
-import {TestCaseStore} from '../../test-explorer/store'
 
 suite('BSP Installer', () => {
   let ctx: vscode.ExtensionContext
   let bazelBSPInstaller: BazelBSPInstaller
-  let buildServerStub: sinon.SinonStubbedInstance<BuildServerManager>
-  let sampleConn: MessageConnection
-  let clientOutputChannel: vscode.LogOutputChannel
   let spawnStub: sinon.SinonStub
   let osMock: any
 
@@ -40,6 +30,7 @@ suite('BSP Installer', () => {
     arch: string
     isGzipped: boolean
     javaVersion: string
+    additionalInstallFlags?: string[]
   }
 
   const setupInstallTest = (config: InstallTestConfig) => {
@@ -61,6 +52,8 @@ suite('BSP Installer', () => {
       .returns('2.0.0')
       .withArgs(settings.SettingName.SERVER_INSTALL_MODE)
       .returns('Prompt')
+      .withArgs(settings.SettingName.ADDITIONAL_INSTALL_FLAGS)
+      .returns(config.additionalInstallFlags || [])
 
     sandbox.stub(fs, 'readFile').resolves(
       `#if( $pythonEnabled == "true" && $bazel8OrAbove == "true" )
@@ -249,5 +242,25 @@ load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_loc
       .returns('Disabled')
     const actualInstallResult = await bazelBSPInstaller.install()
     assert.ok(!actualInstallResult)
+  })
+
+  test('additional install flags', async () => {
+    const config = {
+      ...testConfigs.macArm64,
+      additionalInstallFlags: [
+        '-J-Djavax.net.ssl.trustStore=/path/to/ca/cacerts',
+        '-J-Djavax.net.ssl.trustStorePassword=xxxx',
+      ],
+    }
+    setupInstallTest(config)
+
+    await bazelBSPInstaller.install()
+
+    assert.equal(spawnStub.callCount, 1)
+    const spawnCall = spawnStub.getCalls()[0]
+    const commandString = spawnCall.args[0]
+    config.additionalInstallFlags.forEach(flag => {
+      assert.ok(commandString.includes(flag))
+    })
   })
 })
