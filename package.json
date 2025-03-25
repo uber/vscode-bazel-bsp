@@ -3,7 +3,7 @@
   "displayName": "Bazel Build Server Protocol (BSP)",
   "description": "Bazel BSP integration for VS Code.",
   "publisher": "Uber",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "license": "Apache-2.0",
   "repository": "https://github.com/uber/vscode-bazel-bsp",
   "engines": {
@@ -50,6 +50,10 @@
           "default": "./.bsp/projectview.bazelproject",
           "description": "Project view file containing Bazel information for this workspace. Path should be relative to the root of the project git repository. See https://ij.bazel.build/docs/project-views.html for details.",
           "pattern": ".*\\.bazelproject$"
+        },
+        "bazelbsp.additionalInstallFlags": {
+          "type": "array",
+          "description": "Additional flags to be added when installing the BSP server."
         },
         "bazelbsp.serverVersion": {
           "type": "string",
