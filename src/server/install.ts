@@ -186,14 +186,22 @@ export class BazelBSPInstaller {
       ['--bazel-binary', bazelPath],
       ['--targets', '//your/targets/here/...'],
     ])
+
     const flagsString = Array.from(installFlags.entries())
       .map(([key, value]) => `${key} "${value}"`)
       .join(' ')
+    const additionalInstallFlags = getExtensionSetting(
+      SettingName.ADDITIONAL_INSTALL_FLAGS
+    )
+    const additionalInstallFlagsString = additionalInstallFlags
+      ? additionalInstallFlags.join(' ')
+      : ''
 
     const javaVersion =
       os.platform() === 'darwin' ? TEMURIN_JAVA_17 : OPEN_JDK_JAVA_17
     this.outputChannel.appendLine(`Using Java version: ${javaVersion}`)
-    const installCommand = `"${coursierPath}" launch --jvm ${javaVersion} ${MAVEN_PACKAGE}:${config.serverVersion} -M ${INSTALL_METHOD} -- ${flagsString}`
+    const installCommand = `"${coursierPath}" launch --jvm ${javaVersion} ${MAVEN_PACKAGE}:${config.serverVersion} -M ${INSTALL_METHOD} ${additionalInstallFlagsString} -- ${flagsString}`
+    this.outputChannel.appendLine(`Running command: ${installCommand}`)
 
     // Report progress in output channel.
     const installProcess = cp.spawn(installCommand, {cwd: root, shell: true})
