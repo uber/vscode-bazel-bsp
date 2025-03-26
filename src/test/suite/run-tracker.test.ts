@@ -600,4 +600,88 @@ suite('Test Run Tracker', () => {
     // Debug session won't be started automatically.
     assert.strictEqual(startDebuggingStub.callCount, 0)
   })
+
+  test('debug session, only starts on first ready pattern match', async () => {
+    // Debug enabled in this test case, and valid settings present.
+    settingsStub
+      .withArgs(settings.SettingName.DEBUG_ENABLED)
+      .returns(true)
+      .withArgs(settings.SettingName.LAUNCH_CONFIG_NAME)
+      .returns('myLaunchConfig')
+      .withArgs(settings.SettingName.DEBUG_READY_PATTERN)
+      .returns('^Ready to Debug')
+      .withArgs(settings.SettingName.DEBUG_BAZEL_FLAGS)
+      .returns(['--my_flag_1', '--my_flag_2'])
+
+    const startDebuggingStub = sandbox
+      .stub(vscode.debug, 'startDebugging')
+      .resolves(true)
+
+    // Set up test run tracker configured in debug mode.
+    const debugRunProfile = testController.createRunProfile(
+      'sample',
+      vscode.TestRunProfileKind.Debug,
+      () => {}
+    )
+    const request = new vscode.TestRunRequest([], [], debugRunProfile)
+    const run = testController.createTestRun(request)
+    runSpy = sandbox.spy(run)
+
+    // New TestRunTracker with the debug run profile.
+    const testRunnerWithDebug = new TestRunTracker({
+      testCaseMetadata: metadata,
+      run: run,
+      request: request,
+      originName: 'sample',
+      cancelToken: cancelTokenSource.token,
+      languageToolManager: languageToolStub,
+      coverageTracker: coverageTracker,
+    })
+
+    // Send sample messages with multiple ready pattern matches.
+    const sampleMessages: LogMessageParams[] = [
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'sample log message',
+      },
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'Ready to Debug on port 5000', // First match
+      },
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'sample log message3',
+      },
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'Ready to Debug on port 5000', // Second match - should be ignored
+      },
+    ]
+
+    for (const params of sampleMessages) {
+      testRunnerWithDebug.onBuildLogMessage(params)
+    }
+
+    // Call for each message, plus newline sequences and debug start message.
+    assert.equal(runSpy.appendOutput.callCount, 9)
+    assert.equal(
+      runSpy.appendOutput
+        .getCalls()
+        .filter(call => call.args[0].includes('Starting remote debug session'))
+        .length,
+      1
+    )
+
+    // Ensure that debug session is started only once with correct launch config.
+    assert.strictEqual(startDebuggingStub.callCount, 1)
+    sinon.assert.calledWithExactly(
+      startDebuggingStub,
+      vscode.workspace.workspaceFolders?.[0],
+      fakeLaunchConfig
+    )
+  })
 })

@@ -71,6 +71,7 @@ export class TestRunTracker implements TaskOriginHandlers {
   private pending: Thenable<void>[] = []
   private buildTaskTracker: TaskEventTracker = new TaskEventTracker()
   private debugInfo: DebugInfo | undefined
+  private hasDebugSessionBeenInitiated = false
 
   constructor(params: RunTrackerParams) {
     this.allTests = new Map<TestItemType, TestCaseInfo[]>()
@@ -235,8 +236,10 @@ export class TestRunTracker implements TaskOriginHandlers {
     // If the message matches the configured pattern, start the debug session.
     if (
       this.debugInfo?.launchConfig &&
-      this.debugInfo.readyPattern?.test(params.message)
+      this.debugInfo.readyPattern?.test(params.message) &&
+      !this.hasDebugSessionBeenInitiated
     ) {
+      this.hasDebugSessionBeenInitiated = true
       this.run.appendOutput(
         `Starting remote debug session [Launch config: '${this.debugInfo.launchConfig.name}']\r\n`
       )
