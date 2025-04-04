@@ -83,7 +83,7 @@ suite('Java Language Tools', () => {
   test('no matching test class name', async () => {
     const result = await languageTools.getDocumentTestCases(
       vscode.Uri.file(
-        path.join(fixtureDir, 'language_files', 'SampleInvalidTest.java')
+        path.join(fixtureDir, 'language_files', 'SampleNonTestClass.java')
       )
     )
 
