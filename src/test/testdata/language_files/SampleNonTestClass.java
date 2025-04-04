@@ -6,7 +6,7 @@ import static org.junit.Assert.assertNotNull;
 import com.uber.testing.base.TestBase;
 import org.junit.Test;
 
-public class SampleValidExampleTest {
+public class SampleNonTestClass {
   @Test
   public void testGetInstance() {
     SampleClientProvider instance =
