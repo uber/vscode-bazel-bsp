@@ -1,4 +1,5 @@
 import * as vscode from 'vscode'
+import * as bsp from '../bsp/bsp'
 import {Inject, OnModuleInit} from '@nestjs/common'
 
 import {
@@ -7,6 +8,9 @@ import {
 } from '../custom-providers'
 import {TestCaseInfo} from '../test-info/test-info'
 import {BuildTargetIdentifier} from 'src/bsp/bsp'
+
+const CONTEXT_KEY_TARGETS_RESULT = 'testExplorerBuildTargetsResult'
+const CONTEXT_KEY_SOURCES_RESULT = 'testExplorerSourcesResult'
 
 export class TestCaseStore implements OnModuleInit, vscode.Disposable {
   @Inject(EXTENSION_CONTEXT_TOKEN) private readonly ctx: vscode.ExtensionContext
@@ -17,7 +21,7 @@ export class TestCaseStore implements OnModuleInit, vscode.Disposable {
   // Watcher to update a test item's children.  Key corresponds to the test item ID.
   testItemWatchers: Map<string, vscode.FileSystemWatcher>
   knownFiles: Set<string>
-  private targetIdentifiers: Map<string, vscode.TestItem>
+  targetIdentifiers: Map<string, vscode.TestItem>
 
   constructor() {
     this.testCaseMetadata = new WeakMap<vscode.TestItem, TestCaseInfo>()
@@ -82,5 +86,42 @@ export class TestCaseStore implements OnModuleInit, vscode.Disposable {
 
   clearTargetIdentifiers() {
     this.targetIdentifiers.clear()
+  }
+
+  cacheBuildTargetsResult(result: bsp.WorkspaceBuildTargetsResult) {
+    this.ctx.workspaceState.update(CONTEXT_KEY_TARGETS_RESULT, result)
+  }
+
+  getCachedBuildTargetsResult(): bsp.WorkspaceBuildTargetsResult | undefined {
+    return this.ctx.workspaceState.get<bsp.WorkspaceBuildTargetsResult>(
+      CONTEXT_KEY_TARGETS_RESULT
+    )
+  }
+
+  cacheSourcesResult(params: bsp.SourcesParams, result: bsp.SourcesResult) {
+    const key = JSON.stringify(params)
+    const allResults =
+      this.ctx.workspaceState.get<Record<string, bsp.SourcesResult>>(
+        CONTEXT_KEY_SOURCES_RESULT
+      ) || {}
+
+    // Add or update the result for this params key
+    allResults[key] = result
+    this.ctx.workspaceState.update(CONTEXT_KEY_SOURCES_RESULT, allResults)
+  }
+
+  getCachedSourcesResult(
+    params: bsp.SourcesParams
+  ): bsp.SourcesResult | undefined {
+    const key = JSON.stringify(params)
+    const allResults = this.ctx.workspaceState.get<
+      Record<string, bsp.SourcesResult>
+    >(CONTEXT_KEY_SOURCES_RESULT)
+    return allResults?.[key]
+  }
+
+  clearCache() {
+    this.ctx.workspaceState.update(CONTEXT_KEY_TARGETS_RESULT, undefined)
+    this.ctx.workspaceState.update(CONTEXT_KEY_SOURCES_RESULT, undefined)
   }
 }

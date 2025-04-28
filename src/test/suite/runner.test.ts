@@ -52,6 +52,10 @@ suite('Test Runner', () => {
     ctx = {
       subscriptions: [],
       asAbsolutePath: (relativePath: string) => `/sample/${relativePath}`,
+      workspaceState: {
+        update: sandbox.stub(),
+        get: sandbox.stub().resolves(undefined),
+      },
     } as unknown as vscode.ExtensionContext
     const moduleRef = await Test.createTestingModule({
       providers: [
