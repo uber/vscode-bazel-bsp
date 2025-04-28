@@ -82,14 +82,22 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     // Restore cached source files for targets that have them.
     const promises: Promise<void>[] = []
     for (const [key, testItem] of this.store.targetIdentifiers.entries()) {
-      const target: bsp.BuildTargetIdentifier = JSON.parse(key)
-      const sourceParams: bsp.SourcesParams = {
-        targets: [target],
+      let cachedSourceFiles: bsp.SourcesResult | undefined
+      try {
+        const target: bsp.BuildTargetIdentifier = JSON.parse(key)
+        const sourceParams: bsp.SourcesParams = {
+          targets: [target],
+        }
+        cachedSourceFiles = this.store.getCachedSourcesResult(sourceParams)
+      } catch (e) {
+        this.outputChannel.appendLine(
+          `Invalid key '${key}' when restoring source files: ${e}`
+        )
       }
-      const cachedSourceFiles = this.store.getCachedSourcesResult(sourceParams)
+
       if (cachedSourceFiles) {
         this.outputChannel.appendLine(
-          `Restoring source files for target: ${target.uri}`
+          `Restoring source files for target: ${key}`
         )
         try {
           testItem.canResolveChildren = false
@@ -100,7 +108,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
           promises.push(promise)
         } catch (e) {
           this.outputChannel.appendLine(
-            `Error restoring source files for target: ${target.uri}`
+            `Error restoring source files for target: ${key}`
           )
         }
       }
