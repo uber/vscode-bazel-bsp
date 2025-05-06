@@ -80,6 +80,29 @@ suite('Java Language Tools', () => {
     assert.equal(result.documentTest?.name, 'TestSampleValidExample')
   })
 
+  test('process test cases, junit 5', async () => {
+    const result = await languageTools.getDocumentTestCases(
+      vscode.Uri.file(
+        path.join(fixtureDir, 'language_files', 'TestSampleJUnit5.java')
+      )
+    )
+
+    assert.strictEqual(result.isTestFile, true)
+    assert.strictEqual(result.testCases.length, 2)
+
+    const expectedBaseTestFilter =
+      'com.sample.project.common.client.samplepackage.TestSampleJUnit5'
+
+    const expectedTests = ['testCase1', 'testCase2']
+    for (const test of result.testCases) {
+      assert.ok(expectedTests.includes(test.name))
+      assert.ok(test.testFilter.startsWith(expectedBaseTestFilter))
+      assert.ok(test.testFilter.endsWith(test.name))
+    }
+    assert.equal(result.documentTest?.testFilter, expectedBaseTestFilter)
+    assert.equal(result.documentTest?.name, 'TestSampleJUnit5')
+  })
+
   test('no matching test class name', async () => {
     const result = await languageTools.getDocumentTestCases(
       vscode.Uri.file(

@@ -8,7 +8,7 @@ import {SourceFileTestCaseInfo, TestCaseInfo} from '../test-info/test-info'
 
 const TEST_FILE_REGEX = /^(Test.+\.java|.+Test\.java)$/
 const JAVA_TEST_REGEX =
-  /@Test\s+.*\s+public void (?<methodName>\w+)|public class (?<className>(Test\w*|\w+Test))\s+/
+  /@Test\s+.*\s+void (?<methodName>\w+)|class (?<className>(Test\w*|\w+Test))\s+/
 const PACKAGE_NAME_REGEX =
   /package\s+(?<packageName>([a-zA-Z_][a-zA-Z0-9_]*)(\.[a-zA-Z_][a-zA-Z0-9_]*)*);/
 const PARAMETERIZED_TEST_REGEX = /^(?<lookupKey>.*?)(?=\[.*?\])(.*)$/
