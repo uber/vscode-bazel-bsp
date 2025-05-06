@@ -25,7 +25,12 @@
 			  "--extensionTestsPath=${workspaceFolder}/build/test/suite/index",
 			  "--disable-extensions"
 			],
-			"outFiles": ["${workspaceFolder}/build/test/**/*.js"],
+			"outFiles": ["${workspaceFolder}/build/**/*.js"],
+			"sourceMaps": true,
+			"resolveSourceMapLocations": [
+				"${workspaceFolder}/**",
+				"!**/node_modules/**"
+			],
 			"preLaunchTask": "npm: test-compile"
 		  }
 	]

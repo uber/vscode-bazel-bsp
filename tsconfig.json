@@ -8,6 +8,8 @@
 			"DOM"
 		],
 		"sourceMap": true,
+		"inlineSourceMap": false,
+		"inlineSources": true,
 		"rootDir": "src",
 		"strict": true,
 		"esModuleInterop": true,
