@@ -9,7 +9,7 @@
 		],
 		"sourceMap": true,
 		"inlineSourceMap": false,
-        "inlineSources": true,
+		"inlineSources": true,
 		"rootDir": "src",
 		"strict": true,
 		"esModuleInterop": true,
