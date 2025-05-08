@@ -39,8 +39,84 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
 
   onModuleInit() {
     this.ctx.subscriptions.push(this)
+    this.restorePriorTests()
+      .catch(e => {
+        this.outputChannel.appendLine(`Error restoring prior tests: ${e}`)
+      })
+      .finally(() => {
+        this.registerHandlers()
+      })
+  }
+
+  registerHandlers() {
     this.store.testController.resolveHandler = this.resolveHandler.bind(this)
     this.store.testController.refreshHandler = this.refreshHandler.bind(this)
+  }
+
+  private async restorePriorTests() {
+    await this.resolveRoot()
+    const cachedBuildTargetsResult = this.store.getCachedBuildTargetsResult()
+
+    // Restore the root test item and build targets.
+    let addedTargets = false
+    if (cachedBuildTargetsResult) {
+      this.outputChannel.appendLine('Restoring prior test cases')
+      const root = this.store.testController.items.get('root')
+      if (root) {
+        try {
+          this.outputChannel.appendLine('Restoring Source Files for Root')
+          await this.processWorkspaceBuildTargetsResult(
+            root,
+            cachedBuildTargetsResult
+          )
+          root.canResolveChildren = false
+          addedTargets = true
+        } catch (e) {
+          this.outputChannel.appendLine(
+            `Error restoring source files for root: ${e}`
+          )
+        }
+      }
+    }
+
+    // Restore cached source files for targets that have them.
+    const promises: Promise<void>[] = []
+    for (const [key, testItem] of this.store.targetIdentifiers.entries()) {
+      let cachedSourceFiles: bsp.SourcesResult | undefined
+      try {
+        const target: bsp.BuildTargetIdentifier = JSON.parse(key)
+        const sourceParams: bsp.SourcesParams = {
+          targets: [target],
+        }
+        cachedSourceFiles = this.store.getCachedSourcesResult(sourceParams)
+      } catch (e) {
+        this.outputChannel.appendLine(
+          `Invalid key '${key}' when restoring source files: ${e}`
+        )
+      }
+
+      if (cachedSourceFiles) {
+        this.outputChannel.appendLine(
+          `Restoring source files for target: ${key}`
+        )
+        try {
+          testItem.canResolveChildren = false
+          const promise = this.processTargetSourcesResult(
+            testItem,
+            cachedSourceFiles
+          )
+          promises.push(promise)
+        } catch (e) {
+          this.outputChannel.appendLine(
+            `Error restoring source files for target: ${key}`
+          )
+        }
+      }
+    }
+    await Promise.all(promises)
+
+    // Kick off discovery of test cases in other open files that may not have been discovered yet.
+    if (addedTargets) await this.resolveOpenSourceFiles()
   }
 
   dispose() {}
@@ -74,7 +150,6 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
         if (parentTest === undefined) {
           try {
             await this.buildServer.getConnection()
-            this.resolveRoot()
           } catch (e) {
             this.outputChannel.appendLine(
               'Test explorer disabled due to lack of available build server.'
@@ -102,6 +177,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
                 'Fetching test targets from build server ([progress](command:bazelbsp.showServerOutput))',
             })
             await this.resolveTargets(parentTest, combinedToken)
+            await this.resolveOpenSourceFiles()
             break
           case TestItemType.BazelTarget:
             progress.report({
@@ -124,6 +200,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
    * @param token Cancellation token tied to the refresh button on the VS Code UI.
    */
   private async refreshHandler(token: vscode.CancellationToken) {
+    this.store.clearCache()
     const promises: Promise<void>[] = []
     this.store.testController.items.forEach(async item => {
       promises.push(this.resolveHandler(item, token))
@@ -173,6 +250,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
         bsp.WorkspaceBuildTargets.type,
         cancellationToken
       )
+      this.store.cacheBuildTargetsResult(result)
     } catch (e) {
       if (e.code === CANCEL_ERROR_CODE) {
         updateDescription(
@@ -184,7 +262,13 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       updateDescription(parentTest, 'Error: unable to fetch targets')
       throw e
     }
+    await this.processWorkspaceBuildTargetsResult(parentTest, result)
+  }
 
+  private async processWorkspaceBuildTargetsResult(
+    parentTest: vscode.TestItem,
+    result: bsp.WorkspaceBuildTargetsResult
+  ) {
     updateDescription(parentTest, 'Loading: processing target results')
 
     // Process the returned targets, create new test items, and store their metadata.
@@ -243,8 +327,6 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     // Replace all children with the newly returned test cases.
     this.condenseTestItems(parentTest)
     updateDescription(parentTest)
-
-    await this.resolveOpenSourceFiles()
   }
 
   /**
@@ -357,6 +439,17 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       params,
       cancellationToken
     )
+    this.store.cacheSourcesResult(params, result)
+    await this.processTargetSourcesResult(parentTest, result)
+  }
+
+  private async processTargetSourcesResult(
+    parentTest: vscode.TestItem,
+    result: bsp.SourcesResult,
+    cancellationToken?: vscode.CancellationToken
+  ) {
+    const parentTarget = this.store.testCaseMetadata.get(parentTest)?.target
+    if (!parentTarget) return
 
     const directories = new Map<string, vscode.TestItem>()
     parentTest.children.replace([])

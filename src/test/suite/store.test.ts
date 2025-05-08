@@ -21,18 +21,29 @@ import {LanguageToolManager} from '../../language-tools/manager'
 import sinon from 'sinon'
 import {BuildTargetIdentifier} from 'src/bsp/bsp'
 import {SyncHintDecorationsManager} from '../../test-explorer/decorator'
+import * as bsp from '../../bsp/bsp'
 
 suite('Test Controller', () => {
   let ctx: vscode.ExtensionContext
   let testCaseStore: TestCaseStore
   let sandbox: sinon.SinonSandbox
 
+  let workspaceStateUpdateStub: sinon.SinonStub
+  let workspaceStateGetStub: sinon.SinonStub
+
   beforeEach(async () => {
     sandbox = sinon.createSandbox()
+
+    workspaceStateUpdateStub = sandbox.stub()
+    workspaceStateGetStub = sandbox.stub()
 
     ctx = {
       subscriptions: [],
       asAbsolutePath: (relativePath: string) => `/sample/${relativePath}`,
+      workspaceState: {
+        update: workspaceStateUpdateStub,
+        get: workspaceStateGetStub,
+      },
     } as unknown as vscode.ExtensionContext
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -165,6 +176,149 @@ suite('Test Controller', () => {
     assert.strictEqual(
       testCaseStore.getTargetIdentifier(targetIdentifier),
       undefined
+    )
+  })
+
+  test('cache build targets result', async () => {
+    await testCaseStore.onModuleInit()
+
+    const mockResult: bsp.WorkspaceBuildTargetsResult = {
+      targets: [
+        {
+          id: {uri: 'file:///path/to/target1'},
+          displayName: 'target1',
+          baseDirectory: '/path/to',
+          tags: [],
+          capabilities: {canCompile: true, canTest: true, canRun: true},
+          languageIds: [],
+          dependencies: [],
+        },
+      ],
+    }
+
+    testCaseStore.cacheBuildTargetsResult(mockResult)
+    assert.ok(
+      workspaceStateUpdateStub.calledWith(
+        'testExplorerBuildTargetsResult',
+        mockResult
+      )
+    )
+  })
+
+  test('cache sources result', async () => {
+    await testCaseStore.onModuleInit()
+
+    const mockParams: bsp.SourcesParams = {
+      targets: [{uri: 'file:///path/to/target1'}],
+    }
+    const mockResult: bsp.SourcesResult = {
+      items: [
+        {
+          target: {uri: 'file:///path/to/target1'},
+          sources: [
+            {
+              uri: 'file:///path/to/source1.java',
+              kind: bsp.SourceItemKind.File,
+              generated: false,
+            },
+          ],
+        },
+      ],
+    }
+
+    const existingContents: Record<string, bsp.SourcesResult> = {
+      '{"targets":[{"uri":"file:///path/to/existingTarget"}]}': {
+        items: [
+          {
+            target: {uri: 'file:///path/to/existingTarget'},
+            sources: [
+              {
+                uri: 'file:///path/to/existingSource',
+                kind: bsp.SourceItemKind.File,
+                generated: false,
+              },
+            ],
+          },
+        ],
+      },
+    }
+
+    workspaceStateGetStub.returns(existingContents)
+
+    testCaseStore.cacheSourcesResult(mockParams, mockResult)
+
+    const expectedResult = {
+      ...existingContents,
+      '{"targets":[{"uri":"file:///path/to/target1"}]}': mockResult,
+    }
+    assert.ok(
+      workspaceStateUpdateStub.calledWith(
+        'testExplorerSourcesResult',
+        expectedResult
+      )
+    )
+  })
+
+  test('get cached sources result', async () => {
+    await testCaseStore.onModuleInit()
+
+    const mockParams: bsp.SourcesParams = {
+      targets: [{uri: 'file:///path/to/target1'}],
+    }
+    const mockResult: bsp.SourcesResult = {
+      items: [
+        {
+          target: {uri: 'file:///path/to/target1'},
+          sources: [
+            {
+              uri: 'file:///path/to/source1.java',
+              kind: bsp.SourceItemKind.File,
+              generated: false,
+            },
+          ],
+        },
+      ],
+    }
+
+    const existingContents: Record<string, bsp.SourcesResult> = {
+      '{"targets":[{"uri":"file:///path/to/existingTarget"}]}': {
+        items: [
+          {
+            target: {uri: 'file:///path/to/existingTarget'},
+            sources: [
+              {
+                uri: 'file:///path/to/existingSource',
+                kind: bsp.SourceItemKind.File,
+                generated: false,
+              },
+            ],
+          },
+        ],
+      },
+      '{"targets":[{"uri":"file:///path/to/target1"}]}': mockResult,
+    }
+
+    workspaceStateGetStub.returns(existingContents)
+
+    const result = testCaseStore.getCachedSourcesResult(mockParams)
+    assert.deepStrictEqual(result, mockResult)
+  })
+
+  test('clear cache', async () => {
+    await testCaseStore.onModuleInit()
+
+    testCaseStore.clearCache()
+    assert.ok(
+      workspaceStateUpdateStub.calledWith(
+        'testExplorerBuildTargetsResult',
+        undefined
+      )
+    )
+    assert.ok(
+      workspaceStateUpdateStub.calledWith(
+        'testExplorerSourcesResult',
+        undefined
+      )
     )
   })
 })

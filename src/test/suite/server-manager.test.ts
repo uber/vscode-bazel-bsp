@@ -45,7 +45,13 @@ suite('Build Server', () => {
     sandbox.stub(rpc, 'createMessageConnection').returns(sampleConn)
     sandbox.stub(Utils, 'getWorkspaceGitRoot').resolves('/sample/path')
 
-    ctx = {subscriptions: []} as unknown as vscode.ExtensionContext
+    ctx = {
+      subscriptions: [],
+      workspaceState: {
+        update: sandbox.stub(),
+        get: sandbox.stub().resolves(undefined),
+      },
+    } as unknown as vscode.ExtensionContext
     const moduleRef = await Test.createTestingModule({
       providers: [contextProviderFactory(ctx), BuildServerManager],
     })

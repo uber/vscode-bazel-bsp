@@ -47,6 +47,8 @@ suite('Test Resolver', () => {
   let syncHintStub: sinon.SinonStubbedInstance<SyncHintDecorationsManager>
   let sampleConn: MessageConnection
   let extensionSettingStub: sinon.Stub
+  let workspaceStateUpdateStub: sinon.SinonStub
+  let workspaceStateGetStub: sinon.SinonStub
 
   const sandbox = sinon.createSandbox()
 
@@ -60,6 +62,8 @@ suite('Test Resolver', () => {
     buildClientStub = sandbox.createStubInstance(BazelBSPBuildClient)
     languageToolsStub = sandbox.createStubInstance(BaseLanguageTools)
     syncHintStub = sandbox.createStubInstance(SyncHintDecorationsManager)
+    workspaceStateUpdateStub = sandbox.stub()
+    workspaceStateGetStub = sandbox.stub()
 
     // Return a fixed workspace root to avoid impact of local environment.
     sandbox
@@ -68,6 +72,10 @@ suite('Test Resolver', () => {
     ctx = {
       subscriptions: [],
       asAbsolutePath: (relativePath: string) => `/sample/${relativePath}`,
+      workspaceState: {
+        update: workspaceStateUpdateStub,
+        get: workspaceStateGetStub,
+      },
     } as unknown as vscode.ExtensionContext
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -116,7 +124,12 @@ suite('Test Resolver', () => {
   test('onModuleInit', async () => {
     testResolver.onModuleInit()
     assert.equal(ctx.subscriptions.length, 1)
+  })
+
+  test('registerHandlers', async () => {
+    testResolver.registerHandlers()
     assert.ok(testCaseStore.testController.resolveHandler)
+    assert.ok(testCaseStore.testController.refreshHandler)
   })
 
   suite('resolveHandler', () => {
@@ -274,7 +287,7 @@ suite('Test Resolver', () => {
 
     beforeEach(() => {
       testCaseStore.onModuleInit()
-      testResolver.onModuleInit()
+      testResolver.registerHandlers()
 
       buildClientStub.getInitializeResult.resolves({
         displayName: 'sample',
@@ -298,31 +311,6 @@ suite('Test Resolver', () => {
       onDidOpenStub = sandbox.stub(vscode.workspace, 'onDidOpenTextDocument')
       onDidOpenStub.returns({dispose: () => {}})
       sendRequestStub = sandbox.stub(sampleConn, 'sendRequest')
-    })
-
-    test('root', async () => {
-      assert.ok(testCaseStore.testController.items.get('root') === undefined)
-
-      // Run with undefined test case creates a new root in the test controller and metadata.
-      assert.ok(testCaseStore.testController.resolveHandler)
-      await testCaseStore.testController.resolveHandler(undefined)
-      const root = testCaseStore.testController.items.get('root')
-      assert.ok(root)
-      assert.ok(root.canResolveChildren)
-      assert.equal(root.children.size, 0)
-      assert.ok(root.uri?.path.endsWith('projectview.bazelproject'))
-
-      const metadata = testCaseStore.testCaseMetadata.get(root)
-      assert.ok(metadata)
-      assert.equal(metadata.type, TestItemType.Root)
-
-      // A second run respects modified URI.
-      await testCaseStore.testController.resolveHandler(undefined)
-      const root2 = testCaseStore.testController.items.get('root')
-      assert.ok(root2)
-      assert.strictEqual(root2.label, root.label)
-      assert.strictEqual(root2.id, root.id)
-      assert.ok(root2.uri?.path.endsWith('projectview2.bazelproject'))
     })
 
     test('targets below root', async () => {
@@ -386,6 +374,13 @@ suite('Test Resolver', () => {
         }
         recursiveCheck(root)
       }
+
+      assert.ok(
+        workspaceStateUpdateStub.calledOnceWith(
+          'testExplorerBuildTargetsResult',
+          sampleBuildTargetsResult
+        )
+      )
     })
 
     test('error getting targets', async () => {
@@ -408,6 +403,8 @@ suite('Test Resolver', () => {
       } catch (e) {
         assert.ok(e instanceof Error)
       }
+
+      assert.ok(workspaceStateUpdateStub.notCalled)
     })
 
     test('no targets returned', async () => {
@@ -430,6 +427,13 @@ suite('Test Resolver', () => {
       await testCaseStore.testController.resolveHandler(root)
       const message = root.error as vscode.MarkdownString
       assert.ok(message.value.includes('No test targets found'))
+
+      assert.ok(
+        workspaceStateUpdateStub.calledOnceWith(
+          'testExplorerBuildTargetsResult',
+          emptyResult
+        )
+      )
     })
 
     test('source files within a target', async () => {
@@ -902,6 +906,188 @@ suite('Test Resolver', () => {
       await testCaseStore.testController.refreshHandler(tokenSource.token)
       assert.equal(root.children.size, 0)
       assert.ok(root.description?.startsWith('Refresh Canceled:'))
+    })
+
+    test('targets below root, restored', async () => {
+      sendRequestStub.returns(Promise.resolve(sampleBuildTargetsResult))
+
+      workspaceStateGetStub
+        .onFirstCall()
+        .returns(sampleBuildTargetsResult)
+        .onSecondCall()
+        .returns(sampleSourceItemsResult(sampleBuildTargetsResult.targets[0]))
+
+      assert.ok(testCaseStore.testController.resolveHandler)
+
+      let resolveRegisterHandlers!: () => void
+      const registerHandlersPromise = new Promise<void>(resolve => {
+        resolveRegisterHandlers = resolve
+      })
+
+      sandbox.stub(testResolver, 'registerHandlers').callsFake(() => {
+        resolveRegisterHandlers()
+      })
+
+      testResolver.onModuleInit()
+      await registerHandlersPromise
+
+      // Validate items below the root
+      const root = testCaseStore.testController.items.get('root')
+      assert.ok(root)
+      assert.equal(root.children.size, 2)
+      validateIDValues(
+        ['e', '{targetdir}:/repo/root/base/directory'],
+        root.children
+      )
+
+      // Validate directory nesting
+      const targetDirTestItem = root.children.get(
+        '{targetdir}:/repo/root/base/directory'
+      )
+      assert.ok(targetDirTestItem)
+      assert.equal(targetDirTestItem.children.size, 2)
+      validateIDValues(
+        [
+          '{targetdir}:/repo/root/base/directory/a',
+          '{targetdir}:/repo/root/base/directory/d',
+        ],
+        targetDirTestItem.children
+      )
+
+      // Validate targets placed under directories
+      const sampleTarget = targetDirTestItem.children
+        .get('{targetdir}:/repo/root/base/directory/d')
+        ?.children.get('d')
+      assert.ok(sampleTarget)
+      assert.ok(sampleTarget.canResolveChildren)
+      assert.equal(sampleTarget.children.size, 0)
+
+      // Proper filtering based on target capabilities.
+      const shouldBeExcluded = sampleBuildTargetsResult.targets.filter(
+        target =>
+          target.capabilities.canTest === false ||
+          target.capabilities.canTest === undefined
+      )
+
+      for (const excluded of shouldBeExcluded) {
+        const recursiveCheck = (item: vscode.TestItem) => {
+          item.children.forEach(child => {
+            recursiveCheck(child)
+            assert.equal(item.children.get(excluded.id.uri), undefined)
+          })
+        }
+        recursiveCheck(root)
+      }
+    })
+
+    test('expand targets based on open files, restored', async () => {
+      const sourcesResultCache: Record<string, bsp.SourcesResult> = {}
+      for (const target of sampleBuildTargetsResult.targets) {
+        sourcesResultCache[
+          JSON.stringify({
+            targets: [target.id],
+          })
+        ] = sampleSourceItemsResult(target)
+      }
+
+      // JSON parse failure for one target
+      const jsonParseStub = sandbox.stub(JSON, 'parse')
+      jsonParseStub.onFirstCall().callsFake(() => {
+        jsonParseStub.restore()
+        throw new Error('json parse error')
+      })
+
+      workspaceStateGetStub
+        .onFirstCall()
+        .returns(sampleBuildTargetsResult)
+        .onSecondCall()
+        .returns(sourcesResultCache)
+
+      languageToolsStub.getDocumentTestCases.resolves({
+        isTestFile: true,
+        testCases: getSampleDocumentTestItems(),
+        documentTest: {
+          name: 'My Document',
+          range: new vscode.Range(
+            new vscode.Position(0, 0),
+            new vscode.Position(0, 0)
+          ),
+          uri: documentStub.uri,
+          testFilter: 'test_file.py',
+        },
+      })
+
+      let resolveRegisterHandlers!: () => void
+      const registerHandlersPromise = new Promise<void>(resolve => {
+        resolveRegisterHandlers = resolve
+      })
+
+      sandbox.stub(testResolver, 'registerHandlers').callsFake(() => {
+        resolveRegisterHandlers()
+      })
+
+      testResolver.onModuleInit()
+      await registerHandlersPromise
+      const root = testCaseStore.testController.items.get('root')
+      assert.ok(root)
+
+      // Validate expected document positions in the tree.
+      const docTestItem = [
+        // Target a's files not reloaded successfully.
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/a')
+          ?.children.get('a'),
+        // Target's d's files reloaded successfully.
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/d')
+          ?.children.get('d')
+          ?.children.get(
+            '{sourcefile}:d:/repo/root/base/directory/d/MyFile1.language'
+          ),
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/d')
+          ?.children.get('d')
+          ?.children.get(
+            '{sourcefile}:d:/repo/root/base/directory/d/MyFile2.language'
+          ),
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/d')
+          ?.children.get('d')
+          ?.children.get('{sourcedir}:d:/repo/root/base/directory/d/src/dir')
+          ?.children.get('{sourcedir}:d:/repo/root/base/directory/d/src/dir/1')
+          ?.children.get(
+            '{sourcefile}:d:/repo/root/base/directory/d/src/dir/1/MyFile4.language'
+          ),
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/d')
+          ?.children.get('d')
+          ?.children.get('{sourcedir}:d:/repo/root/base/directory/d/src/dir')
+          ?.children.get('{sourcedir}:d:/repo/root/base/directory/d/src/dir/2')
+          ?.children.get(
+            '{sourcefile}:d:/repo/root/base/directory/d/src/dir/2/MyFile5.language'
+          ),
+        root.children
+          .get('{targetdir}:/repo/root/base/directory')
+          ?.children.get('{targetdir}:/repo/root/base/directory/d')
+          ?.children.get('d')
+          ?.children.get('{sourcedir}:d:/repo/root/base/directory/d/src/dir')
+          ?.children.get('{sourcedir}:d:/repo/root/base/directory/d/src/dir/2')
+          ?.children.get(
+            '{sourcefile}:d:/repo/root/base/directory/d/src/dir/2/MyFile6.language'
+          ),
+      ]
+
+      for (const item of docTestItem) {
+        assert.ok(item)
+        item.children.forEach(child => {
+          assert.ok(testCaseStore.testCaseMetadata.get(child))
+        })
+      }
     })
   })
 })
