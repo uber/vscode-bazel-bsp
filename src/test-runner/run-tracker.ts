@@ -499,7 +499,7 @@ export class TestRunTracker implements TaskOriginHandlers {
    * @param ideClient IDE client identifier (e.g., 'vscode', 'cursor')
    */
   public setIdeTag(ideClient: string): void {
-    // Use Bazel's --define flag which is specifically designed for user-defined values
+    // use test_env to set the IDE_CLIENT environment variable
     this.ideTag = `--test_env=IDE_CLIENT=${ideClient}`
   }
 
