@@ -124,9 +124,9 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
       }
     }
 
-    // Add the IDE tag (--define flag) to additionalBazelParams
+    // Additional Bazel params is not supported in BSP coverage for now
     const ideTag = currentRun.getIdeTag()
-    if (ideTag && ideTag.trim().length > 0) {
+    if (ideTag && !bazelParams.coverage) {
       if (bazelParams.additionalBazelParams) {
         bazelParams.additionalBazelParams += ` ${ideTag}`
       } else {

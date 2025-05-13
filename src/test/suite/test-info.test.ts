@@ -207,7 +207,7 @@ suite('TestInfo', () => {
       const currentRun = sandbox.createStubInstance(TestRunTracker)
       sandbox.stub(currentRun, 'originName').get(() => 'sample')
       currentRun.getRunProfileKind.returns(vscode.TestRunProfileKind.Run)
-      currentRun.getIdeTag.returns('--define=ide_client=cursor')
+      currentRun.getIdeTag.returns('--test_env=IDE_CLIENT=cursor')
 
       const result = testInfo.prepareTestRunParams(currentRun)
       assert.deepStrictEqual(result, {
@@ -223,7 +223,7 @@ suite('TestInfo', () => {
         dataKind: TestParamsDataKind.BazelTest,
         data: {
           coverage: false,
-          additionalBazelParams: '--define=ide_client=cursor',
+          additionalBazelParams: '--test_env=IDE_CLIENT=cursor',
         },
       })
     })

@@ -134,7 +134,7 @@ suite('Test Runner Factory', () => {
         sampleToken
       )
       assert.ok(detectIdeClientStub.calledOnce)
-      assert.equal(runTracker.getIdeTag(), '--define=ide_client=test-ide')
+      assert.equal(runTracker.getIdeTag(), '--test_env=IDE_CLIENT=test-ide')
     } finally {
       detectIdeClientStub.restore()
     }

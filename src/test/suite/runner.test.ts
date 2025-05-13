@@ -238,7 +238,7 @@ suite('Test Runner', () => {
       assert.ok(!callArgs[1].data.coverage)
       assert.strictEqual(
         callArgs[1].data.additionalBazelParams,
-        '--my_flag_1 --my_flag_2 --define=ide_client=cursor'
+        '--my_flag_1 --my_flag_2 --test_env=IDE_CLIENT=cursor'
       )
       assert.strictEqual(callArgs[1].dataKind, TestParamsDataKind.BazelTest)
     }
