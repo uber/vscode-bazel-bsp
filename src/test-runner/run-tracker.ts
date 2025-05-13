@@ -500,7 +500,7 @@ export class TestRunTracker implements TaskOriginHandlers {
    */
   public setIdeTag(ideClient: string): void {
     // Use Bazel's --define flag which is specifically designed for user-defined values
-    this.ideTag = `--define=ide_client=${ideClient}`
+    this.ideTag = `--test_env=IDE_CLIENT=${ideClient}`
   }
 
   /**
