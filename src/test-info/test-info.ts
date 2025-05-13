@@ -124,6 +124,16 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
       }
     }
 
+    // Add the IDE tag (--define flag) to additionalBazelParams
+    const ideTag = currentRun.getIdeTag()
+    if (ideTag && ideTag.trim().length > 0) {
+      if (bazelParams.additionalBazelParams) {
+        bazelParams.additionalBazelParams += ` ${ideTag}`
+      } else {
+        bazelParams.additionalBazelParams = ideTag
+      }
+    }
+
     const params = {
       targets: [this.target.id],
       originId: currentRun.originName,

@@ -72,6 +72,7 @@ export class TestRunTracker implements TaskOriginHandlers {
   private buildTaskTracker: TaskEventTracker = new TaskEventTracker()
   private debugInfo: DebugInfo | undefined
   private hasDebugSessionBeenInitiated = false
+  private ideTag: string
 
   constructor(params: RunTrackerParams) {
     this.allTests = new Map<TestItemType, TestCaseInfo[]>()
@@ -83,6 +84,7 @@ export class TestRunTracker implements TaskOriginHandlers {
     this.cancelToken = params.cancelToken
     this.coverageTracker = params.coverageTracker
     this.languageToolManager = params.languageToolManager
+    this.ideTag = 'unknown'
 
     this.prepareCurrentRun()
     this.prepareDebugInfo()
@@ -490,6 +492,23 @@ export class TestRunTracker implements TaskOriginHandlers {
           formatTestResultMessage(testFinishData)
         )
     }
+  }
+
+  /**
+   * Set the IDE tag to be used for this test run
+   * @param ideClient IDE client identifier (e.g., 'vscode', 'cursor')
+   */
+  public setIdeTag(ideClient: string): void {
+    // Use Bazel's --define flag which is specifically designed for user-defined values
+    this.ideTag = `--define=ide_client=${ideClient}`
+  }
+
+  /**
+   * Get the IDE tag for this test run
+   * @returns The IDE client identifier
+   */
+  public getIdeTag(): string {
+    return this.ideTag
   }
 }
 

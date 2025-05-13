@@ -4,7 +4,7 @@ import sinon from 'sinon'
 import {afterEach} from 'mocha'
 import * as zlib from 'zlib'
 
-import {Deferred, Utils} from '../../utils/utils'
+import {Deferred, Utils, detectIdeClient} from '../../utils/utils'
 
 suite('Utils Test Suite', () => {
   const sandbox = sinon.createSandbox()
@@ -117,6 +117,71 @@ suite('Utils Test Suite', () => {
       assert.fail('Should have thrown an error')
     } catch (error) {
       assert.ok(error instanceof Error)
+    }
+  })
+
+  test('detectIdeClient with different environments', async () => {
+    const processEnv = process.env
+
+    const testCases = [
+      {
+        env: {
+          PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/path/to/.vscode/remote-cli',
+          __CFBundleIdentifier: '',
+        },
+        expected: 'vscode',
+        name: 'VSCode remote',
+      },
+      {
+        env: {
+          PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin',
+          __CFBundleIdentifier: 'com.microsoft.VSCode',
+        },
+        expected: 'vscode',
+        name: 'VSCode local',
+      },
+      {
+        env: {
+          PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/path/to/.cursor/remote-cli',
+          __CFBundleIdentifier: '',
+        },
+        expected: 'cursor',
+        name: 'Cursor remote',
+      },
+      {
+        env: {
+          PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin',
+          __CFBundleIdentifier: 'com.todesktop.230313mzl4w4u92',
+        },
+        expected: 'cursor',
+        name: 'Cursor local',
+      },
+      {
+        env: {
+          PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin',
+          __CFBundleIdentifier: 'com.microsoft.VSCodeInsiders',
+        },
+        expected: 'vscode-insiders',
+        name: 'VSCode Insiders local',
+      },
+      {
+        env: {
+          PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin',
+          __CFBundleIdentifier: '',
+        },
+        expected: 'unknown',
+        name: 'Unknown IDE',
+      },
+    ]
+
+    try {
+      for (const {env, expected, name} of testCases) {
+        process.env = env
+        const result = detectIdeClient()
+        assert.strictEqual(result, expected, `Failed: ${name}`)
+      }
+    } finally {
+      process.env = processEnv
     }
   })
 })

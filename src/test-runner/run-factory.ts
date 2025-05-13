@@ -7,6 +7,7 @@ import {TestRunTracker} from './run-tracker'
 import {BazelBSPBuildClient} from '../test-explorer/client'
 import {CoverageTracker} from '../coverage-utils/coverage-tracker'
 import {LanguageToolManager} from '../language-tools/manager'
+import {detectIdeClient} from '../utils/utils'
 
 @Injectable()
 export class RunTrackerFactory {
@@ -36,6 +37,9 @@ export class RunTrackerFactory {
       coverageTracker: this.coverageTracker,
       languageToolManager: this.languageToolManager,
     })
+
+    const ideClient = detectIdeClient()
+    requestTracker.setIdeTag(ideClient)
 
     this.buildClient.registerOriginHandlers(originId, requestTracker)
     requestTracker.onDone(() =>
