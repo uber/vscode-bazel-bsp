@@ -120,6 +120,70 @@ suite('Utils Test Suite', () => {
     }
   })
 
+  test('detectIdeClient', async () => {
+    const originalEnv = process.env
+
+    const testCases = [
+      {
+        env: {
+          PATH: '',
+          __CFBundleIdentifier: 'com.microsoft.VSCode',
+        },
+        expected: 'vscode',
+        name: 'VSCode via bundle ID 1',
+      },
+      {
+        env: {
+          PATH: '',
+          __CFBundleIdentifier: 'com.microsoft.VSCodeInsiders',
+        },
+        expected: 'vscode-insiders',
+        name: 'VSCode via bundle ID 2',
+      },
+      {
+        env: {
+          PATH: '/usr/bin:/path/to/.vscode/abc/remote-cli',
+          __CFBundleIdentifier: '',
+        },
+        expected: 'vscode',
+        name: 'VSCode via PATH 1',
+      },
+      {
+        env: {
+          PATH: '',
+          __CFBundleIdentifier: 'com.todesktop.230313mzl4w4u92',
+        },
+        expected: 'cursor',
+        name: 'Cursor via bundle ID 1',
+      },
+      {
+        env: {
+          PATH: '/usr/bin:/path/to/.cursor/abc/remote-cli',
+          __CFBundleIdentifier: '',
+        },
+        expected: 'cursor',
+        name: 'Cursor via PATH',
+      },
+      {
+        env: {
+          PATH: '/usr/bin:/bin:/usr/local/bin',
+          __CFBundleIdentifier: '',
+        },
+        expected: 'unknown',
+        name: 'Unknown IDE',
+      },
+    ]
+
+    for (const testCase of testCases) {
+      process.env = {...testCase.env}
+      const result = detectIdeClient()
+      assert.strictEqual(result, testCase.expected)
+    }
+
+    // Restore original environment
+    process.env = originalEnv
+  })
+
   test('detectIdeClient with different environments', async () => {
     const processEnv = process.env
 
