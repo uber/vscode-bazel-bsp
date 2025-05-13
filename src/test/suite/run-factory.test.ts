@@ -22,6 +22,7 @@ import {TestItemFactory} from '../../test-info/test-item-factory'
 import {CoverageTracker} from '../../coverage-utils/coverage-tracker'
 import {LanguageToolManager} from '../../language-tools/manager'
 import {SyncHintDecorationsManager} from '../../test-explorer/decorator'
+import * as utils from '../../utils/utils'
 
 suite('Test Runner Factory', () => {
   let ctx: vscode.ExtensionContext
@@ -116,5 +117,26 @@ suite('Test Runner Factory', () => {
     assert.equal(registerHandlersStub.firstCall.args[0], runTracker.originName)
     assert.equal(registerHandlersStub.firstCall.args[1], runTracker)
     assert.ok(disposeHandlersStub.calledOnce)
+  })
+
+  test('newRun sets IDE tag', async () => {
+    const detectIdeClientStub = sandbox.stub(utils, 'detectIdeClient')
+    detectIdeClientStub.returns('test-ide')
+
+    try {
+      const roots: vscode.TestItem[] = []
+      testCaseStore.testController.items.forEach(item => {
+        roots.push(item)
+      })
+      const sampleToken = new vscode.CancellationTokenSource().token
+      const runTracker = runFactory.newRun(
+        new vscode.TestRunRequest(Array.from(roots)),
+        sampleToken
+      )
+      assert.ok(detectIdeClientStub.calledOnce)
+      assert.equal(runTracker.getIdeTag(), '--test_env=IDE_CLIENT=test-ide')
+    } finally {
+      detectIdeClientStub.restore()
+    }
   })
 })

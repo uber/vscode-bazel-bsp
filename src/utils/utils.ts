@@ -104,3 +104,35 @@ export class Deferred<T> {
     })
   }
 }
+
+/**
+ * Detect which IDE client is being used.
+ * @returns {string} The detected IDE client identifier
+ */
+export function detectIdeClient(): string {
+  const path = process.env.PATH || ''
+  const cfBundleId = process.env.__CFBundleIdentifier || ''
+
+  // Cursor detection
+  if (
+    (path.includes('.cursor') && path.includes('remote-cli')) ||
+    cfBundleId === 'com.todesktop.230313mzl4w4u92'
+  ) {
+    return 'cursor'
+  }
+
+  // VS Code detection
+  if (
+    (path.includes('.vscode') && path.includes('remote-cli')) ||
+    cfBundleId === 'com.microsoft.VSCode'
+  ) {
+    return 'vscode'
+  }
+
+  // VS Code Insiders detection
+  if (cfBundleId === 'com.microsoft.VSCodeInsiders') {
+    return 'vscode-insiders'
+  }
+
+  return 'unknown'
+}

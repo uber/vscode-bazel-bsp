@@ -6,3 +6,4 @@ dist
 .DS_Store
 .bazelbsp
 .bsp
+vscode-bazel-bsp-*.vsix

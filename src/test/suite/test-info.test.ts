@@ -198,6 +198,67 @@ suite('TestInfo', () => {
       const result = testInfo.prepareTestRunParams(currentRun)
       assert.equal(result, undefined)
     })
+
+    test('build target with IDE tag', async () => {
+      const testItem = testController.createTestItem('sample', 'sample')
+      const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
+
+      // Test with IDE tag
+      const currentRun = sandbox.createStubInstance(TestRunTracker)
+      sandbox.stub(currentRun, 'originName').get(() => 'sample')
+      currentRun.getRunProfileKind.returns(vscode.TestRunProfileKind.Run)
+      currentRun.getIdeTag.returns('--test_env=IDE_CLIENT=cursor')
+
+      const result = testInfo.prepareTestRunParams(currentRun)
+      assert.deepStrictEqual(result, {
+        arguments: [],
+        environmentVariables: {},
+        originId: 'sample',
+        targets: [
+          {
+            uri: '//sample/target:test',
+          },
+        ],
+        workingDirectory: '',
+        dataKind: TestParamsDataKind.BazelTest,
+        data: {
+          coverage: false,
+          additionalBazelParams: '--test_env=IDE_CLIENT=cursor',
+        },
+      })
+    })
+
+    test('build target with IDE tag and debug flags', async () => {
+      const testItem = testController.createTestItem('sample', 'sample')
+      const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
+
+      // Test with IDE tag and debug flags
+      const currentRunWithDebug = sandbox.createStubInstance(TestRunTracker)
+      sandbox.stub(currentRunWithDebug, 'originName').get(() => 'sample')
+      currentRunWithDebug.getRunProfileKind.returns(
+        vscode.TestRunProfileKind.Debug
+      )
+      currentRunWithDebug.getIdeTag.returns('--define=ide_client=vscode')
+      currentRunWithDebug.getDebugBazelFlags.returns(['--flag1', '--flag2'])
+
+      const resultWithDebug = testInfo.prepareTestRunParams(currentRunWithDebug)
+      assert.deepStrictEqual(resultWithDebug, {
+        arguments: [],
+        environmentVariables: {},
+        originId: 'sample',
+        targets: [
+          {
+            uri: '//sample/target:test',
+          },
+        ],
+        workingDirectory: '',
+        dataKind: TestParamsDataKind.BazelTest,
+        data: {
+          coverage: false,
+          additionalBazelParams: '--flag1 --flag2 --define=ide_client=vscode',
+        },
+      })
+    })
   })
 
   suite('Set display name', () => {

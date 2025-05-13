@@ -124,6 +124,16 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
       }
     }
 
+    // Additional Bazel params is not supported in BSP coverage for now
+    const ideTag = currentRun.getIdeTag()
+    if (ideTag && !bazelParams.coverage) {
+      if (bazelParams.additionalBazelParams) {
+        bazelParams.additionalBazelParams += ` ${ideTag}`
+      } else {
+        bazelParams.additionalBazelParams = ideTag
+      }
+    }
+
     const params = {
       targets: [this.target.id],
       originId: currentRun.originName,

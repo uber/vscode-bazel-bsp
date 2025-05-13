@@ -31,6 +31,7 @@ import {CoverageTracker} from '../../coverage-utils/coverage-tracker'
 import {LanguageToolManager} from '../../language-tools/manager'
 import {SyncHintDecorationsManager} from '../../test-explorer/decorator'
 import * as settings from '../../utils/settings'
+import * as utils from '../../utils/utils'
 
 suite('Test Runner', () => {
   let ctx: vscode.ExtensionContext
@@ -207,6 +208,9 @@ suite('Test Runner', () => {
       .stub(sampleConn, 'sendRequest')
       .returns(Promise.resolve(sampleResult))
 
+    // Mock the IDE tag detection
+    sandbox.stub(utils, 'detectIdeClient').returns('cursor')
+
     // Ensure run profile creation.
     await testRunner.onModuleInit()
     const runProfile = testRunner.runProfiles.get(
@@ -234,7 +238,7 @@ suite('Test Runner', () => {
       assert.ok(!callArgs[1].data.coverage)
       assert.strictEqual(
         callArgs[1].data.additionalBazelParams,
-        '--my_flag_1 --my_flag_2'
+        '--my_flag_1 --my_flag_2 --test_env=IDE_CLIENT=cursor'
       )
       assert.strictEqual(callArgs[1].dataKind, TestParamsDataKind.BazelTest)
     }
