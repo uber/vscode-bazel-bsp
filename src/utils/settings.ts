@@ -13,6 +13,7 @@ export enum SettingName {
   DEBUG_BAZEL_FLAGS = 'debug.bazelFlags',
   LAUNCH_CONFIG_NAME = 'debug.launchConfigName',
   DEBUG_READY_PATTERN = 'debug.readyPattern',
+  JAVA_USE_DOCUMENT_SYMBOLS = 'java.useDocumentSymbols',
   ADDITIONAL_INSTALL_FLAGS = 'additionalInstallFlags',
 }
 
@@ -27,6 +28,7 @@ export interface SettingTypes {
   [SettingName.DEBUG_BAZEL_FLAGS]: string[]
   [SettingName.LAUNCH_CONFIG_NAME]: string
   [SettingName.DEBUG_READY_PATTERN]: string
+  [SettingName.JAVA_USE_DOCUMENT_SYMBOLS]: boolean
   [SettingName.ADDITIONAL_INSTALL_FLAGS]: string[]
 }
 

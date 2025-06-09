@@ -101,6 +101,11 @@
         "bazelbsp.debug.launchConfigName": {
           "type": "string",
           "description": "Name of launch configuration that will be executed to begin the DAP debugging session. This must be a valid launch configuration in the launch.json file, workspace, or contributed by another extension."
+        },
+        "bazelbsp.java.useDocumentSymbols": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use document symbols to find test cases in Java files. We will fall back to regex if this is not enabled."
         }
       }
     },

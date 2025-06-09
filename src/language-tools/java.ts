@@ -5,6 +5,7 @@ import {DocumentTestItem, LanguageTools, TestFileContents} from './manager'
 import {TestFinish} from '../bsp/bsp'
 import {JUnitStyleTestCaseData, TestFinishDataKind} from '../bsp/bsp-ext'
 import {SourceFileTestCaseInfo, TestCaseInfo} from '../test-info/test-info'
+import {getExtensionSetting, SettingName} from '../utils/settings'
 
 const TEST_FILE_REGEX = /^(Test.+\.java|.+Test\.java)$/
 const JAVA_TEST_REGEX =
@@ -76,8 +77,18 @@ export class JavaLanguageTools implements LanguageTools {
       }
     }
 
-    // Attempt to get document symbols via VS Code API.
-    // TODO(IDE-1109): Request document symbols and process them.
+    // Check if document symbols feature is enabled
+    const useDocumentSymbols = getExtensionSetting(
+      SettingName.JAVA_USE_DOCUMENT_SYMBOLS
+    )
+    if (useDocumentSymbols) {
+      // Attempt to get document symbols via VS Code API.
+      // TODO(IDE-1109): Request document symbols and process them.
+      return {
+        isTestFile: false,
+        testCases: [],
+      }
+    }
 
     // Fallback to resolve directly from document text.
     // Due to the variety of VS Code extensions and setups in the JVM ecosystem, this allows basic functionality even if the user is missing other extensions or has them misconfigured.
