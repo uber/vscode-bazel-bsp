@@ -10,6 +10,8 @@ import {
   TestItemTestCaseInfo,
 } from '../../../test-info/test-info'
 import {sampleBuildTarget} from '../test-utils'
+import * as sinon from 'sinon'
+import * as settings from '../../../utils/settings'
 
 const fixtureDir = path.join(
   __dirname,
@@ -25,13 +27,18 @@ const fixtureDir = path.join(
 suite('Java Language Tools', () => {
   let languageTools: JavaLanguageTools
   let testController: vscode.TestController
+  let settingsStub: sinon.SinonStub
+  const sandbox = sinon.createSandbox()
+
   beforeEach(async () => {
     testController = vscode.tests.createTestController('java sample', 'sample')
     languageTools = new JavaLanguageTools()
+    settingsStub = sandbox.stub(settings, 'getExtensionSetting')
   })
 
   afterEach(async () => {
     testController.dispose()
+    sandbox.restore()
   })
 
   test('process test cases, example 1', async () => {
@@ -401,5 +408,20 @@ suite('Java Language Tools', () => {
     testCaseInfo = new SourceFileTestCaseInfo(testInfo, sampleBuildTarget())
     result = languageTools.mapTestCaseInfoToLookupKey(testCaseInfo)
     assert.strictEqual(result, undefined)
+  })
+
+  test('document symbols feature enabled but not implemented', async () => {
+    settingsStub
+      .withArgs(settings.SettingName.JAVA_USE_DOCUMENT_SYMBOLS)
+      .returns(true)
+
+    const result = await languageTools.getDocumentTestCases(
+      vscode.Uri.file(
+        path.join(fixtureDir, 'language_files', 'SampleValidExampleTest.java')
+      )
+    )
+    assert.strictEqual(result.isTestFile, false)
+    assert.strictEqual(result.testCases.length, 0)
+    assert.strictEqual(result.documentTest, undefined)
   })
 })
