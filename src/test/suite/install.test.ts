@@ -163,7 +163,7 @@ load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_loc
       const spawnCall = spawnStub.getCalls()[0]
       assert.ok(spawnCall.args[0].includes(coursierPath))
       assert.ok(spawnCall.args[0].includes(`--jvm ${config.javaVersion}`))
-      assert.ok(spawnCall.args[0].includes('org.jetbrains.bsp:bazel-bsp:2.0.0'))
+      assert.ok(spawnCall.args[0].includes('org.virtuslab:bazel-bsp:2.0.0'))
       assert.deepStrictEqual(spawnCall.args[1], {
         cwd: '/repo/root',
         shell: true,

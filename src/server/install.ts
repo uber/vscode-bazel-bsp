@@ -18,7 +18,7 @@ import {
 
 export const INSTALL_BSP_COMMAND = 'bazelbsp.install'
 
-const MAVEN_PACKAGE = 'org.jetbrains.bsp:bazel-bsp'
+const MAVEN_PACKAGE = 'org.virtuslab:bazel-bsp'
 const INSTALL_METHOD = 'org.jetbrains.bsp.bazel.install.Install'
 const COURSIER_URL_DEFAULT = 'https://git.io/coursier-cli'
 const COURSIER_URL_APPLE_SILICON =
