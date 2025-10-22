@@ -8,7 +8,7 @@ import {EXTENSION_CONTEXT_TOKEN} from '../custom-providers'
 import {Deferred, Utils} from '../utils/utils'
 const pkg = require('../../package.json')
 
-const SUPPORTED_LANGUAGES = ['java', 'scala', 'kotlin', 'python']
+const SUPPORTED_LANGUAGES = ['java', 'scala', 'kotlin', 'python', 'typescript']
 
 /**
  * To intercept notifications from a specific originId, define custom handlers using this interface.

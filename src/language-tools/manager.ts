@@ -5,6 +5,7 @@ import {BuildTarget, TestFinish} from '../bsp/bsp'
 import {PythonLanguageTools} from './python'
 import {BaseLanguageTools} from './base'
 import {JavaLanguageTools} from './java'
+import {TypeScriptLanguageTools} from './typescript'
 import {TestCaseInfo} from '../test-info/test-info'
 
 /**
@@ -45,9 +46,12 @@ export class LanguageToolManager {
   private baseLanguageTools = new BaseLanguageTools()
   private pythonLanguageTools = new PythonLanguageTools()
   private javaLanguageTools = new JavaLanguageTools()
+  private typescriptLanguageTools = new TypeScriptLanguageTools()
 
   getLanguageTools(target: BuildTarget | undefined): LanguageTools {
-    if (target?.languageIds.find(val => val === 'python')) {
+    if (target?.languageIds.find(val => val === 'typescript')) {
+      return this.typescriptLanguageTools
+    } else if (target?.languageIds.find(val => val === 'python')) {
       return this.pythonLanguageTools
     } else if (target?.languageIds.find(val => val === 'java')) {
       return this.javaLanguageTools
@@ -56,7 +60,9 @@ export class LanguageToolManager {
   }
 
   getLanguageToolsForFile(document: vscode.TextDocument): LanguageTools {
-    if (document.languageId === 'python') {
+    if (document.languageId === 'typescript') {
+      return this.typescriptLanguageTools
+    } else if (document.languageId === 'python') {
       return this.pythonLanguageTools
     } else if (document.languageId === 'java') {
       return this.javaLanguageTools
