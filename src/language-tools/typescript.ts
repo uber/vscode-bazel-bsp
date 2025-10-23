@@ -28,17 +28,12 @@ export class TypeScriptLanguageTools
   }
 
   mapTestCaseInfoToLookupKey(testCaseInfo: TestCaseInfo): string | undefined {
-    if (testCaseInfo instanceof SourceFileTestCaseInfo) {
-      const data = testCaseInfo.getDocumentTestItem()
-      if (data && testCaseInfo.testItem.uri) {
-        const fileName = path.basename(
-          testCaseInfo.testItem.uri.fsPath,
-          path.extname(testCaseInfo.testItem.uri.fsPath)
-        )
-        return `${fileName}.${data.testFilter}`
-      }
+    if (!(testCaseInfo instanceof SourceFileTestCaseInfo)) {
+      return undefined
     }
-    return undefined
+
+    const data = testCaseInfo.getDocumentTestItem()
+    return data?.lookupKey
   }
 
   async getDocumentTestCases(
@@ -57,6 +52,10 @@ export class TypeScriptLanguageTools
     const lines = text.split('\n')
 
     const testCases: DocumentTestItem[] = []
+    const fileName = path.basename(
+      document.fsPath,
+      path.extname(document.fsPath)
+    )
     const documentTest: DocumentTestItem = {
       name: path.basename(document.fsPath),
       range: new vscode.Range(0, 0, 0, 0),
@@ -84,6 +83,7 @@ export class TypeScriptLanguageTools
         range: new vscode.Range(position, position),
         uri: document,
         testFilter: match[1],
+        lookupKey: `${fileName}.${match[1]}`,
       }
       testCases.push(currentDescribe)
     }
@@ -106,6 +106,7 @@ export class TypeScriptLanguageTools
         uri: document,
         testFilter: testName,
         parent: currentDescribe,
+        lookupKey: `${fileName}.${testName}`,
       }
       testCases.push(testItem)
     }
