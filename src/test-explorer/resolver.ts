@@ -18,7 +18,11 @@ import {
 import {getExtensionSetting, SettingName} from '../utils/settings'
 import {Utils} from '../utils/utils'
 import {TestItemFactory} from '../test-info/test-item-factory'
-import {DocumentTestItem, LanguageToolManager} from '../language-tools/manager'
+import {
+  DocumentTestItem,
+  LanguageToolManager,
+  TestFileContents,
+} from '../language-tools/manager'
 import {SyncHintDecorationsManager} from './decorator'
 
 @Injectable()
@@ -271,6 +275,15 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
   ) {
     updateDescription(parentTest, 'Loading: processing target results')
 
+    // Save virtual TypeScript targets before clearing
+    const virtualTargets: vscode.TestItem[] = []
+    parentTest.children.forEach(child => {
+      const metadata = this.store.testCaseMetadata.get(child)
+      if (metadata?.target?.languageIds?.includes('typescript')) {
+        virtualTargets.push(child)
+      }
+    })
+
     // Process the returned targets, create new test items, and store their metadata.
     const directories = new Map<string, vscode.TestItem>()
     const buildFileName = getExtensionSetting(SettingName.BUILD_FILE_NAME)
@@ -303,6 +316,15 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       )
       relevantParent.children.add(newTest)
       this.store.setTargetIdentifier(target.id, newTest)
+    })
+
+    // Restore virtual TypeScript targets
+    virtualTargets.forEach(target => {
+      parentTest.children.add(target)
+      const metadata = this.store.testCaseMetadata.get(target)
+      if (metadata?.target?.id) {
+        this.store.setTargetIdentifier(metadata.target.id, target)
+      }
     })
 
     // If no test items were added, show the getting started message as a test message overlaid on the .bazelproject file.
@@ -412,7 +434,163 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
         return
       }
     }
+
+    if (doc.languageId === 'typescript' && docInfo.isTestFile) {
+      await this.createVirtualTypeScriptTarget(doc, docInfo)
+      return
+    }
+
     this.syncHint.enable(doc.uri, this.repoRoot ?? '', docInfo)
+  }
+
+  private async createVirtualTypeScriptTarget(
+    doc: vscode.TextDocument,
+    docInfo: TestFileContents
+  ) {
+    this.outputChannel.appendLine(
+      `Creating virtual TypeScript target for ${doc.fileName}`
+    )
+
+    const bazelTarget = await this.findBazelTestTarget(doc.uri)
+    if (!bazelTarget) {
+      this.outputChannel.appendLine(
+        `No Bazel jest_test target found for ${doc.fileName}`
+      )
+      return
+    }
+
+    this.outputChannel.appendLine(`Found Bazel target: ${bazelTarget}`)
+
+    const virtualTarget = this.createVirtualBuildTarget(bazelTarget, doc.uri)
+    const root = this.store.testController.items.get('root')
+    if (!root) {
+      this.outputChannel.appendLine('Root test item not found')
+      return
+    }
+
+    // Clear the "No test targets found" error if it was set
+    if (root.error) {
+      root.error = undefined
+    }
+
+    // Create test item using file name as the label
+    const sourceItem: bsp.SourceItem = {
+      uri: doc.uri.toString(),
+      kind: bsp.SourceItemKind.File,
+      generated: false,
+    }
+
+    const fileTestItem = this.testItemFactory.createSourceFileTestItem(
+      virtualTarget,
+      sourceItem
+    )
+    root.children.add(fileTestItem)
+    this.store.setTargetIdentifier(virtualTarget.id, fileTestItem)
+    this.store.knownFiles.add(doc.uri.toString())
+
+    this.outputChannel.appendLine(
+      `Created test file TestItem: ${fileTestItem.label}`
+    )
+
+    await this.populateTypeScriptTestCases(fileTestItem, virtualTarget, docInfo)
+
+    this.outputChannel.appendLine(
+      `Populated ${docInfo.testCases.length} test cases`
+    )
+  }
+
+  private async populateTypeScriptTestCases(
+    fileTestItem: vscode.TestItem,
+    virtualTarget: bsp.BuildTarget,
+    docInfo: TestFileContents
+  ) {
+    const newItems = new Map<DocumentTestItem, vscode.TestItem>()
+    const directChildren: vscode.TestItem[] = []
+
+    for (const testCase of docInfo.testCases) {
+      const newTest = this.testItemFactory.createTestCaseTestItem(
+        testCase,
+        virtualTarget
+      )
+      newItems.set(testCase, newTest)
+
+      if (testCase.parent) {
+        newItems.get(testCase.parent)?.children.add(newTest)
+      } else {
+        directChildren.push(newTest)
+      }
+    }
+
+    fileTestItem.children.replace(directChildren)
+
+    const fileTestInfo = this.store.testCaseMetadata.get(
+      fileTestItem
+    ) as SourceFileTestCaseInfo
+    if (fileTestInfo && docInfo.documentTest) {
+      fileTestInfo.setDocumentTestItem(docInfo.documentTest)
+    }
+  }
+
+  private createVirtualBuildTarget(
+    targetLabel: string,
+    fileUri: vscode.Uri
+  ): bsp.BuildTarget {
+    const packagePath = targetLabel.split(':')[0].replace('//', '')
+
+    return {
+      id: {uri: targetLabel},
+      displayName: path.basename(fileUri.fsPath),
+      baseDirectory: this.repoRoot
+        ? path.join(this.repoRoot, packagePath)
+        : undefined,
+      tags: ['test'],
+      languageIds: ['typescript'],
+      dependencies: [],
+      capabilities: {
+        canCompile: false,
+        canTest: true,
+        canRun: true,
+        canDebug: false,
+      },
+      dataKind: undefined,
+      data: undefined,
+    }
+  }
+
+  private async findBazelTestTarget(
+    fileUri: vscode.Uri
+  ): Promise<string | undefined> {
+    if (!this.repoRoot) return undefined
+
+    const relativePath = path.relative(this.repoRoot, fileUri.fsPath)
+    const packagePath = path.dirname(relativePath)
+
+    const bazelBinary = getExtensionSetting(SettingName.BAZEL_BINARY_PATH)
+    if (!bazelBinary) {
+      this.outputChannel.appendLine('Bazel binary path not configured')
+      return undefined
+    }
+    try {
+      const {exec} = await import('child_process')
+      const {promisify} = await import('util')
+      const execAsync = promisify(exec)
+
+      const queryCmd = `${bazelBinary} query 'kind(jest_test, //${packagePath}:*)' --output=label`
+      this.outputChannel.appendLine(`Running: ${queryCmd}`)
+
+      const {stdout} = await execAsync(queryCmd, {
+        cwd: this.repoRoot,
+      })
+
+      const targets = stdout
+        .trim()
+        .split('\n')
+        .filter(t => t.length > 0)
+      return targets[0]
+    } catch (error) {
+      this.outputChannel.appendLine(`Bazel query failed: ${error}`)
+      return undefined
+    }
   }
 
   /**
