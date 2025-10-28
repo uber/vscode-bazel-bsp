@@ -1,6 +1,9 @@
 import * as vscode from 'vscode'
 import * as assert from 'assert'
 import {beforeEach, afterEach} from 'mocha'
+import * as fs from 'fs'
+import * as path from 'path'
+import * as os from 'os'
 import {TestStatus} from '../../../bsp/bsp'
 import {TypeScriptLanguageTools} from '../../../language-tools/typescript'
 import {TestFinishDataKind} from '../../../bsp/bsp-ext'
@@ -13,14 +16,19 @@ import {sampleBuildTarget} from '../test-utils'
 suite('TypeScript Language Tools', () => {
   let languageTools: TypeScriptLanguageTools
   let testController: vscode.TestController
+  let tempDir: string
 
   beforeEach(async () => {
     testController = vscode.tests.createTestController('ts sample', 'sample')
     languageTools = new TypeScriptLanguageTools()
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vscode-bazel-test-'))
   })
 
   afterEach(() => {
     testController.dispose()
+    if (tempDir && fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, {recursive: true, force: true})
+    }
   })
 
   test('non test file', async () => {
@@ -32,7 +40,7 @@ suite('TypeScript Language Tools', () => {
     assert.strictEqual(result.testCases.length, 0)
   })
 
-  test('regex patterns for describe and it blocks', async () => {
+  test('parses describe and it blocks', async () => {
     const sampleFileContent = `
 describe('UserService', () => {
   it('should create a user', () => {
@@ -50,22 +58,33 @@ describe('AuthService', () => {
   })
 })
 `
-    const DESCRIBE_REGEX = /describe\s*\(\s*['"`]([^'"`]+)['"`]/g
-    const TEST_REGEX = /(?:it|test)\s*\(\s*['"`]([^'"`]+)['"`]/g
+    // Write actual test file
+    const testFilePath = path.join(tempDir, 'user.test.ts')
+    fs.writeFileSync(testFilePath, sampleFileContent)
 
-    const describes = Array.from(sampleFileContent.matchAll(DESCRIBE_REGEX))
-    const tests = Array.from(sampleFileContent.matchAll(TEST_REGEX))
+    const result = await languageTools.getDocumentTestCases(
+      vscode.Uri.file(testFilePath),
+      tempDir
+    )
 
+    assert.strictEqual(result.isTestFile, true)
+    assert.strictEqual(result.testCases.length, 5) // 2 describes + 3 tests
+
+    // Check describe blocks
+    const describes = result.testCases.filter(tc => !tc.parent)
     assert.strictEqual(describes.length, 2)
+    assert.strictEqual(describes[0].name, 'UserService')
+    assert.strictEqual(describes[1].name, 'AuthService')
+
+    // Check test cases
+    const tests = result.testCases.filter(tc => tc.parent)
     assert.strictEqual(tests.length, 3)
-    assert.strictEqual(describes[0][1], 'UserService')
-    assert.strictEqual(describes[1][1], 'AuthService')
-    assert.strictEqual(tests[0][1], 'should create a user')
-    assert.strictEqual(tests[1][1], 'should delete a user')
-    assert.strictEqual(tests[2][1], 'should authenticate user')
+    assert.strictEqual(tests[0].name, 'should create a user')
+    assert.strictEqual(tests[1].name, 'should delete a user')
+    assert.strictEqual(tests[2].name, 'should authenticate user')
   })
 
-  test('regex patterns for nested describe blocks', async () => {
+  test('parses nested describe blocks', async () => {
     const sampleFileContent = `
 describe('Outer Suite', () => {
   describe('Inner Suite', () => {
@@ -75,13 +94,22 @@ describe('Outer Suite', () => {
   })
 })
 `
-    const DESCRIBE_REGEX = /describe\s*\(\s*['"`]([^'"`]+)['"`]/g
-    const TEST_REGEX = /(?:it|test)\s*\(\s*['"`]([^'"`]+)['"`]/g
+    // Write actual test file
+    const testFilePath = path.join(tempDir, 'nested.test.ts')
+    fs.writeFileSync(testFilePath, sampleFileContent)
 
-    const describes = Array.from(sampleFileContent.matchAll(DESCRIBE_REGEX))
-    const tests = Array.from(sampleFileContent.matchAll(TEST_REGEX))
+    const result = await languageTools.getDocumentTestCases(
+      vscode.Uri.file(testFilePath),
+      tempDir
+    )
 
+    assert.strictEqual(result.isTestFile, true)
+    assert.strictEqual(result.testCases.length, 3) // 2 describes + 1 test
+
+    const describes = result.testCases.filter(tc => !tc.parent)
     assert.strictEqual(describes.length, 2)
+
+    const tests = result.testCases.filter(tc => tc.parent)
     assert.strictEqual(tests.length, 1)
   })
 
