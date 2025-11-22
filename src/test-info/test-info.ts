@@ -173,9 +173,13 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
    * @param relativeToItem will be ignored in this implementation
    */
   setDisplayName(relativeToItem?: TestCaseInfo | undefined) {
-    this.testItem.label =
-      this.target.id.uri.split(':').pop() ?? this.target.id.uri
-    this.testItem.description = this.target.displayName
+    if (this.target.languageIds?.includes('typescript')) {
+      this.testItem.label = this.target.displayName ?? this.target.id.uri
+    } else {
+      this.testItem.label =
+        this.target.id.uri.split(':').pop() ?? this.target.id.uri
+      this.testItem.description = this.target.displayName
+    }
   }
 }
 
