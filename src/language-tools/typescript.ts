@@ -20,9 +20,7 @@ export class TypeScriptLanguageTools
       testFinishData.data
     ) {
       const testCaseData = testFinishData.data as JUnitStyleTestCaseData
-      if (testCaseData.className) {
-        return `${testCaseData.className}.${testFinishData.displayName}`
-      }
+      return testCaseData.className || testFinishData.displayName
     }
     return undefined
   }
@@ -52,10 +50,6 @@ export class TypeScriptLanguageTools
     const lines = text.split('\n')
 
     const testCases: DocumentTestItem[] = []
-    const fileName = path.basename(
-      document.fsPath,
-      path.extname(document.fsPath)
-    )
     const documentTest: DocumentTestItem = {
       name: path.basename(document.fsPath),
       range: new vscode.Range(0, 0, 0, 0),
@@ -63,52 +57,73 @@ export class TypeScriptLanguageTools
       testFilter: '',
     }
 
-    const DESCRIBE_REGEX = /describe\s*\(\s*['"`]([^'"`]+)['"`]/g
-    const TEST_REGEX = /(?:it|test)\s*\(\s*['"`]([^'"`]+)['"`]/g
+    const describeStack: DocumentTestItem[] = []
+    const indentStack: number[] = []
 
-    let currentDescribe: DocumentTestItem | undefined
-    let lineStartIndex = 0
-    let currentLine = 0
+    for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+      const line = lines[lineNum]
+      const indent = line.search(/\S/)
 
-    const describeMatches = Array.from(text.matchAll(DESCRIBE_REGEX))
-    for (const match of describeMatches) {
-      while (lineStartIndex + lines[currentLine].length < match.index!) {
-        lineStartIndex += lines[currentLine].length + 1
-        currentLine++
+      if (indent === -1) continue
+
+      while (
+        indentStack.length > 0 &&
+        indent <= indentStack[indentStack.length - 1]
+      ) {
+        describeStack.pop()
+        indentStack.pop()
       }
 
-      const position = new vscode.Position(currentLine, 0)
-      currentDescribe = {
-        name: match[1],
-        range: new vscode.Range(position, position),
-        uri: document,
-        testFilter: match[1],
-        lookupKey: `${fileName}.${match[1]}`,
-      }
-      testCases.push(currentDescribe)
-    }
+      const describeMatch = line.match(/describe\s*\(\s*['"`]([^'"`]+)['"`]/)
+      if (describeMatch) {
+        const position = new vscode.Position(lineNum, 0)
+        const describeName = describeMatch[1]
+        const parent =
+          describeStack.length > 0
+            ? describeStack[describeStack.length - 1]
+            : undefined
 
-    lineStartIndex = 0
-    currentLine = 0
+        const lookupKey = parent?.lookupKey
+          ? `${parent.lookupKey} ${describeName}`
+          : describeName
 
-    const testMatches = Array.from(text.matchAll(TEST_REGEX))
-    for (const match of testMatches) {
-      while (lineStartIndex + lines[currentLine].length < match.index!) {
-        lineStartIndex += lines[currentLine].length + 1
-        currentLine++
+        const describeItem: DocumentTestItem = {
+          name: describeName,
+          range: new vscode.Range(position, position),
+          uri: document,
+          testFilter: describeName,
+          parent: parent,
+          lookupKey: lookupKey,
+        }
+        testCases.push(describeItem)
+        describeStack.push(describeItem)
+        indentStack.push(indent)
+        continue
       }
 
-      const position = new vscode.Position(currentLine, 0)
-      const testName = match[1]
-      const testItem: DocumentTestItem = {
-        name: testName,
-        range: new vscode.Range(position, position),
-        uri: document,
-        testFilter: testName,
-        parent: currentDescribe,
-        lookupKey: `${fileName}.${testName}`,
+      const testMatch = line.match(/(?:it|test)\s*\(\s*['"`]([^'"`]+)['"`]/)
+      if (testMatch) {
+        const position = new vscode.Position(lineNum, 0)
+        const testName = testMatch[1]
+        const parent =
+          describeStack.length > 0
+            ? describeStack[describeStack.length - 1]
+            : undefined
+
+        const lookupKey = parent?.lookupKey
+          ? `${parent.lookupKey} ${testName}`
+          : testName
+
+        const testItem: DocumentTestItem = {
+          name: testName,
+          range: new vscode.Range(position, position),
+          uri: document,
+          testFilter: testName,
+          parent: parent,
+          lookupKey: lookupKey,
+        }
+        testCases.push(testItem)
       }
-      testCases.push(testItem)
     }
 
     return {
