@@ -157,14 +157,19 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
     // The executed test item inherits the overall run status.
     updateStatus(this.testItem, currentRun, result)
 
-    // Remaining items, except those at a level that should execute independently, are marked to inherit the results from their children.
+    // Update remaining children that are more specific than this item's type.
+    // Other targets are left in a pending state so they can run on their own.
     for (const child of currentRun.pendingChildrenIterator(
       this.testItem,
       TestItemType.BazelTarget
     )) {
-      // Only update children that are more specific than this item's type.
-      // This will leave other targets in a pending state so they can run on their own.
-      currentRun.updateStatus(child.testItem, TestCaseStatus.Inherit)
+      if (result.statusCode === StatusCode.Error) {
+        // On error, mark children that didn't receive individual results as failed.
+        currentRun.updateStatus(child.testItem, TestCaseStatus.Failed)
+      } else {
+        // On success, let Test Explorer determine status based on children's outcomes.
+        currentRun.updateStatus(child.testItem, TestCaseStatus.Inherit)
+      }
     }
   }
 

@@ -527,11 +527,14 @@ function formatTestResultMessage(
     if (result.displayName) {
       message += `${ANSI_CODES.RED}[TEST CASE]${ANSI_CODES.RESET} ${result.displayName}\n\n`
     }
-    if (testCaseData.errorType && testCaseData.fullError !== 'null') {
+    if (testCaseData.errorType && testCaseData.errorType !== 'null') {
       message += `${ANSI_CODES.RED}[ERROR TYPE]${ANSI_CODES.RESET} ${testCaseData.errorType}\n\n`
     }
-    if (testCaseData.fullError && testCaseData.fullError !== 'null') {
-      message += `${ANSI_CODES.RED}[FULL ERROR]${ANSI_CODES.RESET}\n\n${testCaseData.fullError}\n\n`
+    if (testCaseData.errorMessage && testCaseData.errorMessage !== 'null') {
+      message += `${ANSI_CODES.RED}[ERROR]${ANSI_CODES.RESET} ${testCaseData.errorMessage}\n\n`
+    }
+    if (testCaseData.errorContent && testCaseData.errorContent !== 'null') {
+      message += `${ANSI_CODES.RED}[FULL ERROR]${ANSI_CODES.RESET}\n\n${testCaseData.errorContent}\n\n`
     }
   }
 
