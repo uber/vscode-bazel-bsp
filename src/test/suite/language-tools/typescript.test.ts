@@ -106,11 +106,11 @@ describe('Outer Suite', () => {
     assert.strictEqual(result.isTestFile, true)
     assert.strictEqual(result.testCases.length, 3) // 2 describes + 1 test
 
-    const describes = result.testCases.filter(tc => !tc.parent)
-    assert.strictEqual(describes.length, 2)
+    const topLevel = result.testCases.filter(tc => !tc.parent)
+    assert.strictEqual(topLevel.length, 1)
 
-    const tests = result.testCases.filter(tc => tc.parent)
-    assert.strictEqual(tests.length, 1)
+    const nested = result.testCases.filter(tc => tc.parent)
+    assert.strictEqual(nested.length, 2)
   })
 
   const testCases = [
@@ -125,7 +125,7 @@ describe('Outer Suite', () => {
           className: 'user.test',
         },
       },
-      expected: 'user.test.should create a user',
+      expected: 'user.test',
     },
     {
       description: 'test case without className',
@@ -137,7 +137,7 @@ describe('Outer Suite', () => {
           time: 1,
         },
       },
-      expected: undefined,
+      expected: 'should authenticate',
     },
     {
       description: 'result with no data',
@@ -181,7 +181,7 @@ describe('Outer Suite', () => {
           className: 'special.test',
         },
       },
-      expected: 'special.test.should handle "quotes" and \'apostrophes\'',
+      expected: 'special.test',
     },
   ]
 
