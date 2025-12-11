@@ -24,6 +24,7 @@ import {
   TestFileContents,
 } from '../language-tools/manager'
 import {SyncHintDecorationsManager} from './decorator'
+import {TypeScriptLanguageTools} from '../language-tools/typescript'
 
 @Injectable()
 export class TestResolver implements OnModuleInit, vscode.Disposable {
@@ -447,46 +448,13 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
 
     const hasSources = result.items.some(item => item.sources.length > 0)
 
-    // If no sources and no dependencies, try to infer source file from jest_test naming convention
     if (!hasSources && parentTarget.dependencies.length === 0) {
-      const targetUri = parentTarget.id.uri
-      // Check if this looks like a jest_test (ends with _jest)
-      if (targetUri.endsWith('_jest')) {
-        // Extract target name: @//path/to:name_jest -> name (without _jest)
-        const colonIndex = targetUri.lastIndexOf(':')
-        if (colonIndex !== -1) {
-          const targetName = targetUri.slice(colonIndex + 1, -5)
-          const isTestFile = targetName.includes('_test_')
-          let baseName = targetName
-            .replace(/_spec_ts_library$/, '')
-            .replace(/_test_ts_library$/, '')
-            .replace(/_ts_library$/, '')
-            .replace(/_spec$/, '')
-            .replace(/_test$/, '')
-          const extension = isTestFile ? '.test.ts' : '.spec.ts'
-          const fileName = baseName.replace(/_/g, '-') + extension
-
-          // Construct full file path from baseDirectory
-          if (parentTarget.baseDirectory) {
-            const fileUri = `${parentTarget.baseDirectory}/${fileName}`
-            // Create a synthetic source result
-            result = {
-              items: [
-                {
-                  target: parentTarget.id,
-                  sources: [
-                    {
-                      uri: fileUri,
-                      kind: 1,
-                      generated: false,
-                    },
-                  ],
-                  roots: [],
-                },
-              ],
-            }
-          }
-        }
+      const inferredResult = TypeScriptLanguageTools.inferSourcesFromJestTarget(
+        parentTarget.id.uri,
+        parentTarget.baseDirectory
+      )
+      if (inferredResult) {
+        result = inferredResult
       }
     } else if (!hasSources && parentTarget.dependencies.length > 0) {
       const depParams: bsp.SourcesParams = {

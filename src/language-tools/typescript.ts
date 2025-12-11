@@ -6,6 +6,7 @@ import {TestFinish} from '../bsp/bsp'
 import {SourceFileTestCaseInfo, TestCaseInfo} from '../test-info/test-info'
 import {BaseLanguageTools} from './base'
 import {JUnitStyleTestCaseData, TestFinishDataKind} from '../bsp/bsp-ext'
+import * as bsp from '../bsp/bsp'
 
 const TEST_FILE_REGEX = /^.+\.(test|spec)\.ts$/
 
@@ -13,6 +14,47 @@ export class TypeScriptLanguageTools
   extends BaseLanguageTools
   implements LanguageTools
 {
+  static inferSourcesFromJestTarget(
+    targetUri: string,
+    baseDirectory: string | undefined
+  ): bsp.SourcesResult | undefined {
+    if (!targetUri.endsWith('_jest') || !baseDirectory) {
+      return undefined
+    }
+
+    const colonIndex = targetUri.lastIndexOf(':')
+    if (colonIndex === -1) {
+      return undefined
+    }
+
+    const targetName = targetUri.slice(colonIndex + 1, -5)
+    const isTestFile = targetName.includes('_test_')
+    const baseName = targetName
+      .replace(/_spec_ts_library$/, '')
+      .replace(/_test_ts_library$/, '')
+      .replace(/_ts_library$/, '')
+      .replace(/_spec$/, '')
+      .replace(/_test$/, '')
+    const extension = isTestFile ? '.test.ts' : '.spec.ts'
+    const fileName = baseName.replace(/_/g, '-') + extension
+    const fileUri = `${baseDirectory}/${fileName}`
+
+    return {
+      items: [
+        {
+          target: {uri: targetUri},
+          sources: [
+            {
+              uri: fileUri,
+              kind: bsp.SourceItemKind.File,
+              generated: false,
+            },
+          ],
+          roots: [],
+        },
+      ],
+    }
+  }
   mapTestFinishDataToLookupKey(testFinishData: TestFinish): string | undefined {
     if (
       testFinishData.dataKind === TestFinishDataKind.JUnitStyleTestCaseData &&
