@@ -14,6 +14,12 @@ export class TypeScriptLanguageTools
   extends BaseLanguageTools
   implements LanguageTools
 {
+  static isValidTestSource(uri: string): boolean {
+    if (uri.includes('node_modules')) return false
+    if (uri.includes('bazel-out')) return false
+    return true
+  }
+
   static inferSourcesFromJestTarget(
     targetUri: string,
     baseDirectory: string | undefined

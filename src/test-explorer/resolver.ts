@@ -446,6 +446,12 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       cancellationToken
     )
 
+    result.items.forEach(item => {
+      item.sources = item.sources.filter(s =>
+        TypeScriptLanguageTools.isValidTestSource(s.uri)
+      )
+    })
+
     const hasSources = result.items.some(item => item.sources.length > 0)
 
     if (!hasSources && parentTarget.dependencies.length === 0) {
@@ -478,6 +484,12 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
   ) {
     const parentTarget = this.store.testCaseMetadata.get(parentTest)?.target
     if (!parentTarget) return
+
+    result.items.forEach(item => {
+      item.sources = item.sources.filter(s =>
+        TypeScriptLanguageTools.isValidTestSource(s.uri)
+      )
+    })
 
     const directories = new Map<string, vscode.TestItem>()
     parentTest.children.replace([])
