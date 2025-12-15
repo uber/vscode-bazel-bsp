@@ -21,8 +21,10 @@ import {
 import {CoverageTracker} from '../coverage-utils/coverage-tracker'
 import {LanguageToolManager} from '../language-tools/manager'
 import {TaskEventTracker} from './task-events'
-import {ANSI_CODES} from '../utils/utils'
+import {ANSI_CODES, Utils} from '../utils/utils'
 import {getExtensionSetting, SettingName} from '../utils/settings'
+import {BazelInfoService} from '../utils/bazel-info'
+import {TypeScriptLanguageTools} from '../language-tools/typescript'
 
 export enum TestCaseStatus {
   Pending,
@@ -49,6 +51,10 @@ type DebugInfo = {
   debugFlags?: string[]
   launchConfig?: vscode.DebugConfiguration
   readyPattern?: RegExp
+  executionRoot?: string
+  targetUri?: string
+  workspaceRoot?: string
+  platform?: string
 }
 
 export class TestRunTracker implements TaskOriginHandlers {
@@ -73,6 +79,7 @@ export class TestRunTracker implements TaskOriginHandlers {
   private debugInfo: DebugInfo | undefined
   private hasDebugSessionBeenInitiated = false
   private ideTag: string
+  private debugInfoReady: Promise<void>
 
   constructor(params: RunTrackerParams) {
     this.allTests = new Map<TestItemType, TestCaseInfo[]>()
@@ -87,7 +94,18 @@ export class TestRunTracker implements TaskOriginHandlers {
     this.ideTag = 'unknown'
 
     this.prepareCurrentRun()
-    this.prepareDebugInfo()
+    // Store the promise so callers can await debug info being ready
+    this.debugInfoReady = this.prepareDebugInfo().catch(() => {
+      // Errors are already reported to the user via run.appendOutput
+    })
+  }
+
+  /**
+   * Waits for debug info to be prepared. Should be called before executing test runs
+   * to ensure debug flags are available.
+   */
+  public async waitForDebugInfo(): Promise<void> {
+    await this.debugInfoReady
   }
 
   public get originName(): string {
@@ -245,9 +263,35 @@ export class TestRunTracker implements TaskOriginHandlers {
       this.run.appendOutput(
         `Starting remote debug session [Launch config: '${this.debugInfo.launchConfig.name}']\r\n`
       )
+
+      // Clone the launch config and inject dynamic paths for TypeScript/Jest debugging
+      let debugConfig = {...this.debugInfo.launchConfig}
+
+      if (
+        this.debugInfo.executionRoot &&
+        this.debugInfo.targetUri &&
+        this.debugInfo.workspaceRoot
+      ) {
+        // Construct remoteRoot for TypeScript/Jest targets
+        const remoteRoot = TypeScriptLanguageTools.constructDebugRemoteRoot(
+          this.debugInfo.executionRoot,
+          this.debugInfo.targetUri,
+          this.debugInfo.platform
+        )
+
+        if (remoteRoot) {
+          // Inject localRoot and remoteRoot for source map resolution
+          debugConfig.localRoot = this.debugInfo.workspaceRoot
+          debugConfig.remoteRoot = remoteRoot
+          this.run.appendOutput(
+            `Dynamic debug paths configured:\r\n  localRoot: ${debugConfig.localRoot}\r\n  remoteRoot: ${debugConfig.remoteRoot}\r\n`
+          )
+        }
+      }
+
       vscode.debug.startDebugging(
         vscode.workspace.workspaceFolders?.[0],
-        this.debugInfo.launchConfig
+        debugConfig
       )
     }
   }
@@ -314,7 +358,7 @@ export class TestRunTracker implements TaskOriginHandlers {
    * During debug runs, this collects and stores the necessary settings that will be applied through this run.
    * In the event that a setting is not found, information will be printed with the test output, but the run will still attempt to proceed.
    */
-  private prepareDebugInfo() {
+  private async prepareDebugInfo() {
     if (this.getRunProfileKind() !== vscode.TestRunProfileKind.Debug) {
       return
     }
@@ -369,10 +413,53 @@ export class TestRunTracker implements TaskOriginHandlers {
       )
     }
 
+    // Get workspace root for Bazel info queries
+    const workspaceRoot = await Utils.getWorkspaceGitRoot()
+    if (!workspaceRoot) {
+      this.run.appendOutput(
+        'Unable to determine workspace root. Dynamic debug path resolution will be skipped.\r\n'
+      )
+      this.debugInfo = {
+        debugFlags: debugFlags,
+        launchConfig: selectedConfig,
+        readyPattern: readyPattern ? new RegExp(readyPattern) : undefined,
+      }
+      return
+    }
+
+    // Query Bazel for execution root and platform
+    const executionRoot = await BazelInfoService.getExecutionRoot(workspaceRoot)
+    const platform = await BazelInfoService.getPlatform(workspaceRoot)
+
+    if (!executionRoot) {
+      this.run.appendOutput(
+        'Unable to query Bazel execution root. Dynamic debug path resolution will be skipped.\r\n'
+      )
+      this.debugInfo = {
+        debugFlags: debugFlags,
+        launchConfig: selectedConfig,
+        readyPattern: readyPattern ? new RegExp(readyPattern) : undefined,
+      }
+      return
+    }
+
+    // Get the first target being debugged (for TypeScript/Jest, typically one target at a time)
+    let targetUri: string | undefined
+    for (const testCaseInfo of this) {
+      if (testCaseInfo.target) {
+        targetUri = testCaseInfo.target.id.uri
+        break
+      }
+    }
+
     this.debugInfo = {
       debugFlags: debugFlags,
       launchConfig: selectedConfig,
       readyPattern: readyPattern ? new RegExp(readyPattern) : undefined,
+      executionRoot: executionRoot,
+      targetUri: targetUri,
+      workspaceRoot: workspaceRoot,
+      platform: platform,
     }
   }
 

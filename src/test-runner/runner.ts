@@ -74,6 +74,10 @@ export class TestRunner implements OnModuleInit, vscode.Disposable {
     const conn = await this.buildServer.getConnection()
     const requestTracker = this.runFactory.newRun(request, cancelToken)
 
+    // Wait for debug info to be prepared before executing tests
+    // This ensures debug flags are available when prepareTestRunParams is called
+    await requestTracker.waitForDebugInfo()
+
     await requestTracker.executeRun(async (item, cancelToken) => {
       await this.runTestCase(item, requestTracker, conn, cancelToken)
     })
