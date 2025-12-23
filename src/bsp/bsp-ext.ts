@@ -66,8 +66,8 @@ export namespace TestFinishDataKind {
 export interface JUnitStyleTestCaseData {
   time: number
   className?: string
-  pkg?: string
-  fullError?: string
+  errorMessage?: string
+  errorContent?: string
   errorType?: string
 }
 

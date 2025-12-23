@@ -18,8 +18,13 @@ import {
 import {getExtensionSetting, SettingName} from '../utils/settings'
 import {Utils} from '../utils/utils'
 import {TestItemFactory} from '../test-info/test-item-factory'
-import {DocumentTestItem, LanguageToolManager} from '../language-tools/manager'
+import {
+  DocumentTestItem,
+  LanguageToolManager,
+  TestFileContents,
+} from '../language-tools/manager'
 import {SyncHintDecorationsManager} from './decorator'
+import {TypeScriptLanguageTools} from '../language-tools/typescript'
 
 @Injectable()
 export class TestResolver implements OnModuleInit, vscode.Disposable {
@@ -412,6 +417,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
         return
       }
     }
+
     this.syncHint.enable(doc.uri, this.repoRoot ?? '', docInfo)
   }
 
@@ -434,11 +440,33 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     const params: bsp.SourcesParams = {
       targets: [parentTarget.id],
     }
-    const result = await conn.sendRequest(
+    let result = await conn.sendRequest(
       bsp.BuildTargetSources.type,
       params,
       cancellationToken
     )
+
+    const hasSources = result.items.some(item => item.sources.length > 0)
+
+    if (!hasSources && parentTarget.dependencies.length === 0) {
+      const inferredResult = TypeScriptLanguageTools.inferSourcesFromJestTarget(
+        parentTarget.id.uri,
+        parentTarget.baseDirectory
+      )
+      if (inferredResult) {
+        result = inferredResult
+      }
+    } else if (!hasSources && parentTarget.dependencies.length > 0) {
+      const depParams: bsp.SourcesParams = {
+        targets: parentTarget.dependencies,
+      }
+      result = await conn.sendRequest(
+        bsp.BuildTargetSources.type,
+        depParams,
+        cancellationToken
+      )
+    }
+
     this.store.cacheSourcesResult(params, result)
     await this.processTargetSourcesResult(parentTest, result)
   }

@@ -7,3 +7,4 @@ dist
 .bazelbsp
 .bsp
 vscode-bazel-bsp-*.vsix
+.npmrc
