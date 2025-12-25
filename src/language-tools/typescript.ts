@@ -25,15 +25,21 @@ export class TypeScriptLanguageTools
    * This path points to the Bazel runfiles directory where the test runs.
    *
    * @param executionRoot The Bazel execution root (from `bazel info execution_root`)
-   * @param targetUri The target URI (e.g., `@//:calculate_test`)
+   * @param targetUri The target URI (e.g., `@//:calculate_test` or `@//path/to/pkg:target`)
    * @param platform The Bazel platform configuration (e.g., `darwin_arm64-fastbuild`)
    * @returns The remoteRoot path for debugging, or undefined if construction fails
    *
-   * @example
-   * executionRoot: "/private/var/tmp/_bazel_hoseni/.../execroot/typescript_jest_test"
-   * targetUri: "@//:calculate_test"
+   * @example Root package target
+   * executionRoot: "/private/var/tmp/_bazel_user/.../execroot/my_workspace"
+   * targetUri: "@//:my_test"
    * platform: "darwin_arm64-fastbuild"
-   * returns: "/private/var/tmp/_bazel_hoseni/.../execroot/typescript_jest_test/bazel-out/darwin_arm64-fastbuild/bin/calculate_test_/calculate_test.runfiles/typescript_jest_test"
+   * returns: ".../bin/my_test_/my_test.runfiles/my_workspace"
+   *
+   * @example Nested package target
+   * executionRoot: "/private/var/tmp/_bazel_user/.../execroot/my_workspace"
+   * targetUri: "@//src/lib:utils_test_jest"
+   * platform: "darwin_arm64-fastbuild"
+   * returns: ".../bin/src/lib/utils_test_jest_/utils_test_jest.runfiles/my_workspace"
    */
   static constructDebugRemoteRoot(
     executionRoot: string,
@@ -44,15 +50,25 @@ export class TypeScriptLanguageTools
       return undefined
     }
 
-    // Extract target name from URI (e.g., "@//:calculate_test" -> "calculate_test")
+    // Extract target name and package path from URI
+    // e.g., "@//:calculate_test" -> package="", target="calculate_test"
+    // e.g., "@//src/path/to/pkg:my_test" -> package="src/path/to/pkg", target="my_test"
     const colonIndex = targetUri.lastIndexOf(':')
     if (colonIndex === -1) {
       return undefined
     }
     const targetName = targetUri.slice(colonIndex + 1)
 
+    // Extract package path (everything between @// and :)
+    // Handle both "@//pkg:target" and "@//:target" (root package)
+    let packagePath = ''
+    const atSlashSlashIndex = targetUri.indexOf('@//')
+    if (atSlashSlashIndex !== -1) {
+      packagePath = targetUri.slice(atSlashSlashIndex + 3, colonIndex)
+    }
+
     // Extract workspace name from execution root
-    // execution_root format: .../execroot/{workspace_name}x
+    // execution_root format: .../execroot/{workspace_name}
     const execrootMatch = executionRoot.match(/execroot[/\\]([^/\\]+)$/)
     if (!execrootMatch) {
       return undefined
@@ -72,19 +88,22 @@ export class TypeScriptLanguageTools
     }
 
     // Construct the runfiles path
-    // Format: {execution_root}/bazel-out/{platform}/bin/{target_name}_/{target_name}.runfiles/{workspace_name}
+    // Format: {execution_root}/bazel-out/{platform}/bin/{package_path}/{target_name}_/{target_name}.runfiles/{workspace_name}
     // Use forward slashes since Bazel paths are always Unix-style
-    const remoteRoot = [
-      executionRoot,
-      'bazel-out',
-      platformToUse,
-      'bin',
+    const pathComponents = [executionRoot, 'bazel-out', platformToUse, 'bin']
+
+    // Add package path if it exists (non-root package)
+    if (packagePath) {
+      pathComponents.push(packagePath)
+    }
+
+    pathComponents.push(
       `${targetName}_`,
       `${targetName}.runfiles`,
-      workspaceName,
-    ]
-      .join('/')
-      .replace(/\/+/g, '/') // Normalize multiple slashes
+      workspaceName
+    )
+
+    const remoteRoot = pathComponents.join('/').replace(/\/+/g, '/') // Normalize multiple slashes
 
     return remoteRoot
   }
