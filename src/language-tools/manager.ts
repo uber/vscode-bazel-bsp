@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import {Injectable} from '@nestjs/common'
 
+import * as bsp from '../bsp/bsp'
 import {BuildTarget, TestFinish} from '../bsp/bsp'
 import {PythonLanguageTools} from './python'
 import {BaseLanguageTools} from './base'
@@ -13,15 +14,18 @@ import {TestCaseInfo} from '../test-info/test-info'
  * The LanguageToolManager will be used throughout the extension to select the right set of language tools given the conditions.
  */
 export interface LanguageTools {
-  // Get a document's test cases and convert them into an intermediate format for use in test case creation.
   getDocumentTestCases(
     document: vscode.Uri,
     workspaceRoot: string
   ): Promise<TestFileContents>
-  // Maps test finish data into a unique key that can be used to find an individual test case in a run.
   mapTestFinishDataToLookupKey(testFinishData: TestFinish): string | undefined
-  // Maps test case info into a unique key  that can be used to find an individual test case in a run.
   mapTestCaseInfoToLookupKey(testCaseInfo: TestCaseInfo): string | undefined
+  getDebugRemoteRoot(workspaceRoot: string, targetUri: string): string | undefined
+  isValidTestSource(uri: string): boolean
+  inferSourcesFromTarget(
+    targetUri: string,
+    baseDirectory: string | undefined
+  ): bsp.SourcesResult | undefined
 }
 
 // Results from analyzing a test file.

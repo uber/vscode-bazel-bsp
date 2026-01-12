@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import * as path from 'path'
+import * as fs from 'fs'
 
 import {DocumentTestItem, LanguageTools, TestFileContents} from './manager'
 import {TestFinish} from '../bsp/bsp'
@@ -14,85 +15,48 @@ export class TypeScriptLanguageTools
   extends BaseLanguageTools
   implements LanguageTools
 {
-  static isValidTestSource(uri: string): boolean {
+  isValidTestSource(uri: string): boolean {
     if (uri.includes('node_modules')) return false
     if (uri.includes('bazel-out')) return false
     return true
   }
 
-  /**
-   * Constructs the debug remoteRoot path for a jest_test target.
-   * This path points to the Bazel runfiles directory where the test runs.
-   *
-   * @param executionRoot The Bazel execution root (from `bazel info execution_root`)
-   * @param targetUri The target URI (e.g., `@//:calculate_test` or `@//path/to/pkg:target`)
-   * @param platform The Bazel platform configuration (e.g., `darwin_arm64-fastbuild`)
-   * @returns The remoteRoot path for debugging, or undefined if construction fails
-   *
-   * @example Root package target
-   * executionRoot: "/private/var/tmp/_bazel_user/.../execroot/my_workspace"
-   * targetUri: "@//:my_test"
-   * platform: "darwin_arm64-fastbuild"
-   * returns: ".../bin/my_test_/my_test.runfiles/my_workspace"
-   *
-   * @example Nested package target
-   * executionRoot: "/private/var/tmp/_bazel_user/.../execroot/my_workspace"
-   * targetUri: "@//src/lib:utils_test_jest"
-   * platform: "darwin_arm64-fastbuild"
-   * returns: ".../bin/src/lib/utils_test_jest_/utils_test_jest.runfiles/my_workspace"
-   */
-  static constructDebugRemoteRoot(
-    executionRoot: string,
-    targetUri: string,
-    platform?: string
+  getDebugRemoteRoot(
+    workspaceRoot: string,
+    targetUri: string
   ): string | undefined {
-    if (!executionRoot || !targetUri) {
+    if (!workspaceRoot || !targetUri) {
       return undefined
     }
 
-    // Extract target name and package path from URI
-    // e.g., "@//:calculate_test" -> package="", target="calculate_test"
-    // e.g., "@//src/path/to/pkg:my_test" -> package="src/path/to/pkg", target="my_test"
     const colonIndex = targetUri.lastIndexOf(':')
     if (colonIndex === -1) {
       return undefined
     }
     const targetName = targetUri.slice(colonIndex + 1)
 
-    // Extract package path (everything between @// and :)
-    // Handle both "@//pkg:target" and "@//:target" (root package)
     let packagePath = ''
     const atSlashSlashIndex = targetUri.indexOf('@//')
     if (atSlashSlashIndex !== -1) {
       packagePath = targetUri.slice(atSlashSlashIndex + 3, colonIndex)
     }
 
-    // Extract workspace name from execution root
-    // execution_root format: .../execroot/{workspace_name}
-    const execrootMatch = executionRoot.match(/execroot[/\\]([^/\\]+)$/)
+    const bazelBinPath = path.join(workspaceRoot, 'bazel-bin')
+    let resolvedBazelBin: string
+    try {
+      resolvedBazelBin = fs.realpathSync(bazelBinPath)
+    } catch {
+      return undefined
+    }
+
+    const execrootMatch = resolvedBazelBin.match(/execroot[/\\]([^/\\]+)/)
     if (!execrootMatch) {
       return undefined
     }
     const workspaceName = execrootMatch[1]
 
-    // Use provided platform or try to detect from execution root path
-    // If not found, use a default that should work for most cases
-    let platformToUse = platform || 'darwin_arm64-fastbuild' // Default fallback
-    if (!platform) {
-      const platformMatch = executionRoot.match(
-        /bazel-out[/\\]([^/\\]+-[^/\\]+)/
-      )
-      if (platformMatch) {
-        platformToUse = platformMatch[1]
-      }
-    }
+    const pathComponents = [resolvedBazelBin]
 
-    // Construct the runfiles path
-    // Format: {execution_root}/bazel-out/{platform}/bin/{package_path}/{target_name}_/{target_name}.runfiles/{workspace_name}
-    // Use forward slashes since Bazel paths are always Unix-style
-    const pathComponents = [executionRoot, 'bazel-out', platformToUse, 'bin']
-
-    // Add package path if it exists (non-root package)
     if (packagePath) {
       pathComponents.push(packagePath)
     }
@@ -103,12 +67,10 @@ export class TypeScriptLanguageTools
       workspaceName
     )
 
-    const remoteRoot = pathComponents.join('/').replace(/\/+/g, '/') // Normalize multiple slashes
-
-    return remoteRoot
+    return pathComponents.join('/').replace(/\/+/g, '/')
   }
 
-  static inferSourcesFromJestTarget(
+  inferSourcesFromTarget(
     targetUri: string,
     baseDirectory: string | undefined
   ): bsp.SourcesResult | undefined {
@@ -131,7 +93,10 @@ export class TypeScriptLanguageTools
       .replace(/_test$/, '')
     const extension = isTestFile ? '.test.ts' : '.spec.ts'
     const fileName = baseName.replace(/_/g, '-') + extension
-    const fileUri = `${baseDirectory}/${fileName}`
+    const normalizedBaseDir = baseDirectory.endsWith('/')
+      ? baseDirectory.slice(0, -1)
+      : baseDirectory
+    const fileUri = `${normalizedBaseDir}/${fileName}`
 
     return {
       items: [
@@ -173,7 +138,9 @@ export class TypeScriptLanguageTools
     document: vscode.Uri,
     workspaceRoot: string
   ): Promise<TestFileContents> {
-    if (!TEST_FILE_REGEX.test(path.basename(document.fsPath))) {
+    const basename = path.basename(document.fsPath)
+    const matchesRegex = TEST_FILE_REGEX.test(basename)
+    if (!matchesRegex) {
       return {
         isTestFile: false,
         testCases: [],

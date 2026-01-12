@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import {LanguageTools, TestFileContents} from './manager'
+import * as bsp from '../bsp/bsp'
 import {TestFinish} from '../bsp/bsp'
 import {TestCaseInfo} from '../test-info/test-info'
 
@@ -25,20 +26,31 @@ export class BaseLanguageTools implements LanguageTools {
     return undefined
   }
 
-  /**
-   * No support for individual test cases or test file identification.
-   * @param document URI of the document to be analyzed for test cases.
-   * @returns Result always contains isTestFile value of false, and no test cases.
-   */
   async getDocumentTestCases(
     document: vscode.Uri,
     workspaceRoot: string
   ): Promise<TestFileContents> {
     return {
-      // Do not filter out any files.
       isTestFile: false,
-      // No test case discovery.
       testCases: [],
     }
+  }
+
+  getDebugRemoteRoot(
+    workspaceRoot: string,
+    targetUri: string
+  ): string | undefined {
+    return undefined
+  }
+
+  isValidTestSource(uri: string): boolean {
+    return true
+  }
+
+  inferSourcesFromTarget(
+    targetUri: string,
+    baseDirectory: string | undefined
+  ): bsp.SourcesResult | undefined {
+    return undefined
   }
 }

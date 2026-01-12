@@ -55,7 +55,6 @@ export class BazelBSPInstaller {
    * @returns Boolean indicating a successful installation.
    */
   public async install(): Promise<boolean> {
-    // Install at the git root of the current workspace.
     const root = await Utils.getWorkspaceGitRoot()
     if (!root) {
       return false
