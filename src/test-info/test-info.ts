@@ -168,7 +168,7 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
         currentRun.updateStatus(child.testItem, TestCaseStatus.Failed)
       } else {
         // On success, let Test Explorer determine status based on children's outcomes.
-        currentRun.updateStatus(child.testItem, TestCaseStatus.Inherit)
+      currentRun.updateStatus(child.testItem, TestCaseStatus.Inherit)
       }
     }
   }
