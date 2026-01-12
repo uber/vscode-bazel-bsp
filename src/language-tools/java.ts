@@ -6,6 +6,7 @@ import {TestFinish} from '../bsp/bsp'
 import {JUnitStyleTestCaseData, TestFinishDataKind} from '../bsp/bsp-ext'
 import {SourceFileTestCaseInfo, TestCaseInfo} from '../test-info/test-info'
 import {getExtensionSetting, SettingName} from '../utils/settings'
+import {BaseLanguageTools} from './base'
 
 const TEST_FILE_REGEX = /^(Test.+\.java|.+Test\.java)$/
 const JAVA_TEST_REGEX =
@@ -14,7 +15,10 @@ const PACKAGE_NAME_REGEX =
   /package\s+(?<packageName>([a-zA-Z_][a-zA-Z0-9_]*)(\.[a-zA-Z_][a-zA-Z0-9_]*)*);/
 const PARAMETERIZED_TEST_REGEX = /^(?<lookupKey>.*?)(?=\[.*?\])(.*)$/
 
-export class JavaLanguageTools implements LanguageTools {
+export class JavaLanguageTools
+  extends BaseLanguageTools
+  implements LanguageTools
+{
   /**
    * Maps testFinishData into a unique identifier for each test case.
    * @param testFinishData TestFinish data reported by the build server.

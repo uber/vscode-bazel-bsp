@@ -20,7 +20,10 @@ export interface LanguageTools {
   ): Promise<TestFileContents>
   mapTestFinishDataToLookupKey(testFinishData: TestFinish): string | undefined
   mapTestCaseInfoToLookupKey(testCaseInfo: TestCaseInfo): string | undefined
-  getDebugRemoteRoot(workspaceRoot: string, targetUri: string): string | undefined
+  getDebugRemoteRoot(
+    workspaceRoot: string,
+    targetUri: string
+  ): string | undefined
   isValidTestSource(uri: string): boolean
   inferSourcesFromTarget(
     targetUri: string,

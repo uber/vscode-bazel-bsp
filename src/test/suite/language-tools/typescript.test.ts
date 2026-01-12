@@ -4,7 +4,7 @@ import {beforeEach, afterEach} from 'mocha'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
-import {TestStatus} from '../../../bsp/bsp'
+import {SourceItemKind, TestStatus} from '../../../bsp/bsp'
 import {TypeScriptLanguageTools} from '../../../language-tools/typescript'
 import {TestFinishDataKind} from '../../../bsp/bsp-ext'
 import {
@@ -226,5 +226,115 @@ describe('Outer Suite', () => {
     testCaseInfo = new SourceFileTestCaseInfo(testInfo, sampleBuildTarget())
     result = languageTools.mapTestCaseInfoToLookupKey(testCaseInfo)
     assert.strictEqual(result, undefined)
+  })
+
+  suite('isValidTestSource', () => {
+    test('returns false for node_modules paths', async () => {
+      assert.strictEqual(
+        languageTools.isValidTestSource(
+          'file:///workspace/node_modules/@types/jest/index.d.ts'
+        ),
+        false
+      )
+      assert.strictEqual(
+        languageTools.isValidTestSource(
+          'file:///workspace/bazel-out/k8-fastbuild/bin/node_modules/.aspect_rules_js/jest/index.js'
+        ),
+        false
+      )
+    })
+
+    test('returns false for bazel-out paths', async () => {
+      assert.strictEqual(
+        languageTools.isValidTestSource(
+          'file:///workspace/bazel-out/darwin_arm64-fastbuild/bin/src/test.js'
+        ),
+        false
+      )
+    })
+
+    test('returns true for valid source paths', async () => {
+      assert.strictEqual(
+        languageTools.isValidTestSource(
+          'file:///workspace/src/components/__tests__/button.spec.ts'
+        ),
+        true
+      )
+      assert.strictEqual(
+        languageTools.isValidTestSource(
+          'file:///workspace/src/utils/helper.test.ts'
+        ),
+        true
+      )
+    })
+  })
+
+  suite('inferSourcesFromTarget', () => {
+    test('returns undefined for non-jest targets', async () => {
+      const result = languageTools.inferSourcesFromTarget(
+        '@//src/lib:my_library',
+        'file:///workspace/src/lib'
+      )
+      assert.strictEqual(result, undefined)
+    })
+
+    test('returns undefined when baseDirectory is undefined', async () => {
+      const result = languageTools.inferSourcesFromTarget(
+        '@//src/lib:my_test_jest',
+        undefined
+      )
+      assert.strictEqual(result, undefined)
+    })
+
+    test('infers spec.ts file from jest target', async () => {
+      const result = languageTools.inferSourcesFromTarget(
+        '@//src/components/__tests__:cart_item_spec_ts_library_jest',
+        'file:///workspace/src/components/__tests__'
+      )
+      assert.ok(result)
+      assert.strictEqual(result.items.length, 1)
+      assert.strictEqual(result.items[0].sources.length, 1)
+      assert.strictEqual(
+        result.items[0].sources[0].uri,
+        'file:///workspace/src/components/__tests__/cart-item.spec.ts'
+      )
+      assert.strictEqual(result.items[0].sources[0].kind, SourceItemKind.File)
+    })
+
+    test('infers test.ts file from jest target with _test_ in name', async () => {
+      const result = languageTools.inferSourcesFromTarget(
+        '@//src/utils:helper_test_ts_library_jest',
+        'file:///workspace/src/utils'
+      )
+      assert.ok(result)
+      assert.strictEqual(
+        result.items[0].sources[0].uri,
+        'file:///workspace/src/utils/helper.test.ts'
+      )
+    })
+
+    test('handles trailing slash in baseDirectory', async () => {
+      const result = languageTools.inferSourcesFromTarget(
+        '@//src/lib:utils_spec_jest',
+        'file:///workspace/src/lib/'
+      )
+      assert.ok(result)
+      assert.strictEqual(
+        result.items[0].sources[0].uri,
+        'file:///workspace/src/lib/utils.spec.ts'
+      )
+    })
+
+    test('converts underscores to hyphens in filename', async () => {
+      const result = languageTools.inferSourcesFromTarget(
+        '@//src:my_cool_component_spec_ts_library_jest',
+        'file:///workspace/src'
+      )
+      assert.ok(result)
+      assert.strictEqual(
+        result.items[0].sources[0].uri,
+        'file:///workspace/src/my-cool-component.spec.ts'
+      )
+    })
   })
 })
