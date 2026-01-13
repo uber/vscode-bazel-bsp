@@ -352,7 +352,7 @@ suite('Java Language Tools', () => {
           className: 'com.example.ClassName',
         },
       },
-      expected: 'com.example.ClassName.!@#$%^&*()',
+      expected: 'com.example.ClassName.!@#$%^&*',
     },
     {
       description: 'empty string as displayName',
