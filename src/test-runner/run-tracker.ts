@@ -321,11 +321,16 @@ export class TestRunTracker implements TaskOriginHandlers {
     }
   }
 
+  /**
+   * During debug runs, this collects and stores the necessary settings that will be applied through this run.
+   * In the event that a setting is not found, information will be printed with the test output, but the run will still attempt to proceed.
+   */
   private prepareDebugInfo() {
     if (this.getRunProfileKind() !== vscode.TestRunProfileKind.Debug) {
       return
     }
 
+    // Determine configured launch configuration name.
     const configName = getExtensionSetting(SettingName.LAUNCH_CONFIG_NAME)
     if (!configName) {
       this.run.appendOutput(
@@ -337,6 +342,7 @@ export class TestRunTracker implements TaskOriginHandlers {
       return
     }
 
+    // Store the selected launch configuration.
     const launchConfigurations = vscode.workspace.getConfiguration('launch')
     const configurations =
       launchConfigurations.get<any[]>('configurations') || []
@@ -352,6 +358,7 @@ export class TestRunTracker implements TaskOriginHandlers {
       )
     }
 
+    // Ensure that matcher pattern is set for the output.
     const readyPattern = getExtensionSetting(SettingName.DEBUG_READY_PATTERN)
     if (!readyPattern) {
       this.run.appendOutput(
@@ -362,6 +369,7 @@ export class TestRunTracker implements TaskOriginHandlers {
       )
     }
 
+    // Ensure that matcher pattern is set for the output.
     let debugFlags = getExtensionSetting(SettingName.DEBUG_BAZEL_FLAGS)
     if (!debugFlags) {
       this.run.appendOutput(

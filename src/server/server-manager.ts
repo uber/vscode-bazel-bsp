@@ -72,6 +72,7 @@ export class BuildServerManager implements vscode.Disposable, OnModuleInit {
       const args = connDetails.argv.slice(1)
       let childProcess = cp.spawn(cmd, args, {cwd: rootDir})
       childProcess.stderr.on('data', data => {
+        // Per BSP spec, issues with the server process are reported via stderr.
         this.outputChannel.appendLine(`[bsp server process] ${data.toString()}`)
       })
 
@@ -90,6 +91,7 @@ export class BuildServerManager implements vscode.Disposable, OnModuleInit {
   private async connectionDetailsWithInstallCheck(
     rootDir: string
   ): Promise<BspConnectionDetails | undefined> {
+    // Return existing connection details if available.
     let connDetails =
       await this.connectionDetailsParser.getServerConnectionDetails(
         SERVER_NAME,

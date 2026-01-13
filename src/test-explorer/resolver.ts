@@ -585,11 +585,14 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       this.store.testCaseMetadata.get(parentTest) as SourceFileTestCaseInfo
     if (!parentTestInfo?.target || parentTest.uri === undefined) return
 
+    // Convert document contents into generic DocumentTestItem data.
     const testFileContents = await this.languageToolManager
       .getLanguageTools(parentTestInfo.target)
       .getDocumentTestCases(parentTest.uri, this.repoRoot ?? '')
 
+    // If document analysis has determined that it is not to be considered a test file, hide it.
     if (!testFileContents.isTestFile) {
+      // If removing this test item leaves the parent empty, clear the parent as well.
       const cleanupEmptyParent = (testItem?: vscode.TestItem) => {
         if (testItem?.children.size === 0) {
           const metadata = this.store.testCaseMetadata.get(testItem)
