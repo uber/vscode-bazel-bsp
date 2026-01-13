@@ -214,8 +214,9 @@ export class TestRunTracker implements TaskOriginHandlers {
       }
 
       if (!hasMatch) {
+        this.run.appendOutput('\n\r')
         this.run.appendOutput(
-          `Updating ${testFinishData.displayName}: Unable to match this test result to an item in this run.\n`
+          `Updating ${testFinishData.displayName}: Unable to match this test result to an item in this run.`
         )
       }
     }

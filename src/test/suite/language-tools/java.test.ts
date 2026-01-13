@@ -367,6 +367,45 @@ suite('Java Language Tools', () => {
       },
       expected: 'com.example.ClassName',
     },
+    {
+      description: 'test method with parentheses (JUnit 5 format)',
+      input: {
+        displayName: 'testMethod()',
+        status: TestStatus.Passed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 0.5,
+          className: 'com.example.ClassName',
+        },
+      },
+      expected: 'com.example.ClassName.testMethod',
+    },
+    {
+      description: 'parameterized test with parentheses',
+      input: {
+        displayName: 'testMethod()[example1]',
+        status: TestStatus.Passed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 0.5,
+          className: 'com.example.ClassName',
+        },
+      },
+      expected: 'com.example.ClassName.testMethod',
+    },
+    {
+      description: 'test method with parentheses but not at end',
+      input: {
+        displayName: 'testMethod()WithMore',
+        status: TestStatus.Passed,
+        dataKind: TestFinishDataKind.JUnitStyleTestCaseData,
+        data: {
+          time: 0.5,
+          className: 'com.example.ClassName',
+        },
+      },
+      expected: 'com.example.ClassName.testMethod()WithMore',
+    },
   ]
 
   for (const testCase of testCases) {
