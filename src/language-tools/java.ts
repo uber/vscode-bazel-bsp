@@ -35,6 +35,9 @@ export class JavaLanguageTools implements LanguageTools {
           testCaseName = match.groups.lookupKey
         }
 
+        // xml files can include trailing parentheses, which aren't part of the original test filter.
+        testCaseName = testCaseName.replace(/\(\)$/, '')
+
         // Use the class name as the base, and append the test case name if available.
         let result = testCaseData.className
         if (testCaseName.length > 0) result += `.${testCaseName}`
