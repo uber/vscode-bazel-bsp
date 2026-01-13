@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import {LanguageTools, TestFileContents} from './manager'
+import * as bsp from '../bsp/bsp'
 import {TestFinish} from '../bsp/bsp'
 import {TestCaseInfo} from '../test-info/test-info'
 
@@ -40,5 +41,23 @@ export class BaseLanguageTools implements LanguageTools {
       // No test case discovery.
       testCases: [],
     }
+  }
+
+  getDebugRemoteRoot(
+    workspaceRoot: string,
+    targetUri: string
+  ): string | undefined {
+    return undefined
+  }
+
+  isValidTestSource(uri: string): boolean {
+    return true
+  }
+
+  inferSourcesFromTarget(
+    targetUri: string,
+    baseDirectory: string | undefined
+  ): bsp.SourcesResult | undefined {
+    return undefined
   }
 }

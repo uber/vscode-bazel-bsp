@@ -21,7 +21,7 @@ import {
 import {CoverageTracker} from '../coverage-utils/coverage-tracker'
 import {LanguageToolManager} from '../language-tools/manager'
 import {TaskEventTracker} from './task-events'
-import {ANSI_CODES} from '../utils/utils'
+import {ANSI_CODES, Utils} from '../utils/utils'
 import {getExtensionSetting, SettingName} from '../utils/settings'
 
 export enum TestCaseStatus {
@@ -49,6 +49,8 @@ type DebugInfo = {
   debugFlags?: string[]
   launchConfig?: vscode.DebugConfiguration
   readyPattern?: RegExp
+  remoteRoot?: string
+  localRoot?: string
 }
 
 export class TestRunTracker implements TaskOriginHandlers {
@@ -73,7 +75,6 @@ export class TestRunTracker implements TaskOriginHandlers {
   private debugInfo: DebugInfo | undefined
   private hasDebugSessionBeenInitiated = false
   private ideTag: string
-
   constructor(params: RunTrackerParams) {
     this.allTests = new Map<TestItemType, TestCaseInfo[]>()
     this.status = new Map<vscode.TestItem, TestCaseStatus>()
@@ -246,9 +247,19 @@ export class TestRunTracker implements TaskOriginHandlers {
       this.run.appendOutput(
         `Starting remote debug session [Launch config: '${this.debugInfo.launchConfig.name}']\r\n`
       )
+
+      const debugConfig = {...this.debugInfo.launchConfig}
+      if (this.debugInfo.localRoot && this.debugInfo.remoteRoot) {
+        debugConfig.localRoot = this.debugInfo.localRoot
+        debugConfig.remoteRoot = this.debugInfo.remoteRoot
+        this.run.appendOutput(
+          `Debug paths:\r\n  localRoot: ${debugConfig.localRoot}\r\n  remoteRoot: ${debugConfig.remoteRoot}\r\n`
+        )
+      }
+
       vscode.debug.startDebugging(
         vscode.workspace.workspaceFolders?.[0],
-        this.debugInfo.launchConfig
+        debugConfig
       )
     }
   }
@@ -370,10 +381,31 @@ export class TestRunTracker implements TaskOriginHandlers {
       )
     }
 
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+    let remoteRoot: string | undefined
+    let targetUri: string | undefined
+    let target: BuildTarget | undefined
+
+    for (const testCaseInfo of this) {
+      if (testCaseInfo.target) {
+        target = testCaseInfo.target
+        targetUri = testCaseInfo.target.id.uri
+        break
+      }
+    }
+
+    if (workspaceRoot && targetUri && target) {
+      remoteRoot = this.languageToolManager
+        .getLanguageTools(target)
+        .getDebugRemoteRoot(workspaceRoot, targetUri)
+    }
+
     this.debugInfo = {
       debugFlags: debugFlags,
       launchConfig: selectedConfig,
       readyPattern: readyPattern ? new RegExp(readyPattern) : undefined,
+      localRoot: workspaceRoot,
+      remoteRoot: remoteRoot,
     }
   }
 

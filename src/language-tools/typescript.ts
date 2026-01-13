@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import * as path from 'path'
+import * as fs from 'fs'
 
 import {DocumentTestItem, LanguageTools, TestFileContents} from './manager'
 import {TestFinish} from '../bsp/bsp'
@@ -14,7 +15,62 @@ export class TypeScriptLanguageTools
   extends BaseLanguageTools
   implements LanguageTools
 {
-  static inferSourcesFromJestTarget(
+  isValidTestSource(uri: string): boolean {
+    if (uri.includes('node_modules')) return false
+    if (uri.includes('bazel-out')) return false
+    return true
+  }
+
+  getDebugRemoteRoot(
+    workspaceRoot: string,
+    targetUri: string
+  ): string | undefined {
+    if (!workspaceRoot || !targetUri) {
+      return undefined
+    }
+
+    const colonIndex = targetUri.lastIndexOf(':')
+    if (colonIndex === -1) {
+      return undefined
+    }
+    const targetName = targetUri.slice(colonIndex + 1)
+
+    let packagePath = ''
+    const atSlashSlashIndex = targetUri.indexOf('@//')
+    if (atSlashSlashIndex !== -1) {
+      packagePath = targetUri.slice(atSlashSlashIndex + 3, colonIndex)
+    }
+
+    const bazelBinPath = path.join(workspaceRoot, 'bazel-bin')
+    let resolvedBazelBin: string
+    try {
+      resolvedBazelBin = fs.realpathSync(bazelBinPath)
+    } catch {
+      return undefined
+    }
+
+    const execrootMatch = resolvedBazelBin.match(/execroot[/\\]([^/\\]+)/)
+    if (!execrootMatch) {
+      return undefined
+    }
+    const workspaceName = execrootMatch[1]
+
+    const pathComponents = [resolvedBazelBin]
+
+    if (packagePath) {
+      pathComponents.push(packagePath)
+    }
+
+    pathComponents.push(
+      `${targetName}_`,
+      `${targetName}.runfiles`,
+      workspaceName
+    )
+
+    return pathComponents.join('/').replace(/\/+/g, '/')
+  }
+
+  inferSourcesFromTarget(
     targetUri: string,
     baseDirectory: string | undefined
   ): bsp.SourcesResult | undefined {
@@ -37,7 +93,10 @@ export class TypeScriptLanguageTools
       .replace(/_test$/, '')
     const extension = isTestFile ? '.test.ts' : '.spec.ts'
     const fileName = baseName.replace(/_/g, '-') + extension
-    const fileUri = `${baseDirectory}/${fileName}`
+    const normalizedBaseDir = baseDirectory.endsWith('/')
+      ? baseDirectory.slice(0, -1)
+      : baseDirectory
+    const fileUri = `${normalizedBaseDir}/${fileName}`
 
     return {
       items: [
@@ -79,7 +138,9 @@ export class TypeScriptLanguageTools
     document: vscode.Uri,
     workspaceRoot: string
   ): Promise<TestFileContents> {
-    if (!TEST_FILE_REGEX.test(path.basename(document.fsPath))) {
+    const basename = path.basename(document.fsPath)
+    const matchesRegex = TEST_FILE_REGEX.test(basename)
+    if (!matchesRegex) {
       return {
         isTestFile: false,
         testCases: [],

@@ -46,6 +46,33 @@ suite('Base Language Tools', () => {
     })
     assert.strictEqual(result, undefined)
   })
+
+  test('isValidTestSource returns true for all sources by default', async () => {
+    assert.strictEqual(
+      languageTools.isValidTestSource('file:///any/path/to/file.go'),
+      true
+    )
+    assert.strictEqual(
+      languageTools.isValidTestSource(
+        'file:///workspace/node_modules/something.js'
+      ),
+      true
+    )
+    assert.strictEqual(
+      languageTools.isValidTestSource(
+        'file:///workspace/bazel-out/bin/test.java'
+      ),
+      true
+    )
+  })
+
+  test('inferSourcesFromTarget returns undefined by default', async () => {
+    const result = languageTools.inferSourcesFromTarget(
+      '@//src:my_target',
+      'file:///workspace/src'
+    )
+    assert.strictEqual(result, undefined)
+  })
 })
 
 const sampleDocumentSymbols: vscode.DocumentSymbol[] = [

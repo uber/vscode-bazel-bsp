@@ -1,6 +1,7 @@
 import * as vscode from 'vscode'
 import {Injectable} from '@nestjs/common'
 
+import * as bsp from '../bsp/bsp'
 import {BuildTarget, TestFinish} from '../bsp/bsp'
 import {PythonLanguageTools} from './python'
 import {BaseLanguageTools} from './base'
@@ -22,6 +23,15 @@ export interface LanguageTools {
   mapTestFinishDataToLookupKey(testFinishData: TestFinish): string | undefined
   // Maps test case info into a unique key  that can be used to find an individual test case in a run.
   mapTestCaseInfoToLookupKey(testCaseInfo: TestCaseInfo): string | undefined
+  getDebugRemoteRoot(
+    workspaceRoot: string,
+    targetUri: string
+  ): string | undefined
+  isValidTestSource(uri: string): boolean
+  inferSourcesFromTarget(
+    targetUri: string,
+    baseDirectory: string | undefined
+  ): bsp.SourcesResult | undefined
 }
 
 // Results from analyzing a test file.
