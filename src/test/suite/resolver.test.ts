@@ -296,6 +296,8 @@ suite('Test Resolver', () => {
         capabilities: {},
       })
 
+      languageToolsStub.isValidTestSource.returns(true)
+
       sandbox.stub(Utils, 'getWorkspaceGitRoot').resolves('/repo/root')
       extensionSettingStub = sandbox.stub(settings, 'getExtensionSetting')
 
