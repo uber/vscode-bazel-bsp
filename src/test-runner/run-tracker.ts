@@ -1,6 +1,11 @@
 import * as vscode from 'vscode'
+import * as path from 'path'
 
-import {TestCaseInfo, TestItemType} from '../test-info/test-info'
+import {
+  SourceFileTestCaseInfo,
+  TestCaseInfo,
+  TestItemType,
+} from '../test-info/test-info'
 import {
   BuildTarget,
   LogMessageParams,
@@ -21,7 +26,7 @@ import {
 import {CoverageTracker} from '../coverage-utils/coverage-tracker'
 import {LanguageToolManager} from '../language-tools/manager'
 import {TaskEventTracker} from './task-events'
-import {ANSI_CODES, Utils} from '../utils/utils'
+import {ANSI_CODES} from '../utils/utils'
 import {getExtensionSetting, SettingName} from '../utils/settings'
 
 export enum TestCaseStatus {
@@ -88,6 +93,7 @@ export class TestRunTracker implements TaskOriginHandlers {
     this.ideTag = 'unknown'
 
     this.prepareCurrentRun()
+    this.prepareCoverageScope()
     this.prepareDebugInfo()
   }
 
@@ -290,6 +296,34 @@ export class TestRunTracker implements TaskOriginHandlers {
 
   public getDebugBazelFlags(): string[] | undefined {
     return this.debugInfo?.debugFlags
+  }
+
+  private prepareCoverageScope() {
+    if (this.getRunProfileKind() !== vscode.TestRunProfileKind.Coverage) {
+      return
+    }
+    if (!this.request.include || this.request.include.length !== 1) {
+      return
+    }
+
+    const includedItem = this.request.include[0]
+    const info = this.testCaseMetadata.get(includedItem)
+    if (!(info instanceof SourceFileTestCaseInfo)) {
+      return
+    }
+
+    const documentUri =
+      info.getDocumentTestItem()?.uri ?? includedItem.uri ?? undefined
+    if (!documentUri) {
+      return
+    }
+
+    let rootDir = path.dirname(documentUri.fsPath)
+    if (path.basename(rootDir) === '__tests__') {
+      rootDir = path.dirname(rootDir)
+    }
+
+    this.coverageTracker.setCoverageRoots(this.run, [rootDir])
   }
 
   /**

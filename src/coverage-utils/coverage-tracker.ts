@@ -14,6 +14,9 @@ export class CoverageTracker {
   // Cumulative line hit count data for a given run, including results from all LCOV files in that run.
   private resultsByRun = new WeakMap<TestRun, fileToLineMapping>()
 
+  // Optional coverage roots to scope coverage results for a run.
+  private coverageRootsByRun = new WeakMap<TestRun, string[]>()
+
   // Processed coverage data for a given file, in required format for VS Code coverage API.
   private coverageStore = new WeakMap<
     vscode.FileCoverage,
@@ -39,6 +42,21 @@ export class CoverageTracker {
         run.appendOutput(`Error processing coverage: ${err}`)
       })
     await this.queue
+  }
+
+  /**
+   * Restrict coverage results to files within the provided roots for this run.
+   * @param run The test run for which coverage will be scoped.
+   * @param roots Absolute paths to directories to include.
+   */
+  public setCoverageRoots(run: TestRun, roots: string[]): void {
+    const normalizedRoots = roots
+      .map(root => path.resolve(root))
+      .filter(root => root.length > 0)
+    if (normalizedRoots.length === 0) {
+      return
+    }
+    this.coverageRootsByRun.set(run, normalizedRoots)
   }
 
   /**
@@ -75,6 +93,13 @@ export class CoverageTracker {
     const reportText = createReadStream(reportPath)
     const parsedReport = await lcovParser({from: reportText})
     for (const fileData of parsedReport) {
+      const filePath = path.isAbsolute(fileData.path)
+        ? fileData.path
+        : path.join(workspaceRoot, fileData.path)
+      if (!this.shouldIncludeCoverage(run, filePath)) {
+        continue
+      }
+
       // hitsPerLine data is cumulative across all lcov reports in a run.
       let hitsPerLine = lineDetail.get(fileData.path) ?? []
       lineDetail.set(fileData.path, hitsPerLine)
@@ -84,7 +109,7 @@ export class CoverageTracker {
         hitsPerLine
       )
       const fileCoverage = vscode.FileCoverage.fromDetails(
-        vscode.Uri.parse(path.join(workspaceRoot, fileData.path)),
+        vscode.Uri.file(filePath),
         fileStatementCoverage
       )
 
@@ -92,6 +117,21 @@ export class CoverageTracker {
       this.coverageStore.set(fileCoverage, fileStatementCoverage)
       run.addCoverage(fileCoverage)
     }
+  }
+
+  private shouldIncludeCoverage(run: TestRun, filePath: string): boolean {
+    const roots = this.coverageRootsByRun.get(run)
+    if (!roots || roots.length === 0) {
+      return true
+    }
+
+    const normalizedPath = path.resolve(filePath)
+    return roots.some(root => {
+      if (normalizedPath === root) {
+        return true
+      }
+      return normalizedPath.startsWith(root + path.sep)
+    })
   }
 
   /**
