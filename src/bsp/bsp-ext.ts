@@ -49,6 +49,16 @@ export interface ExtendedBuildClient {
   onBuildPublishOutput: OnBuildPublishOutput.HandlerSignature
 }
 
+export interface NonModuleTargetsResult {
+  nonModuleTargets: bsp.BuildTarget[]
+}
+
+export namespace WorkspaceNonModuleTargets {
+  export const method = 'workspace/nonModuleTargets' as const
+  export const type = new RequestType0<NonModuleTargetsResult, void>(method)
+  export type HandlerSignature = RequestHandler0<NonModuleTargetsResult, void>
+}
+
 export function registerExtendedBuildClientHandlers(
   connection: MessageConnection,
   handlers: ExtendedBuildClient
