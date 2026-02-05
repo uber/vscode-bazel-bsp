@@ -10,6 +10,7 @@ import {
 } from '../custom-providers'
 import {BuildServerManager, CANCEL_ERROR_CODE} from '../server/server-manager'
 import * as bsp from '../bsp/bsp'
+import * as bspExt from '../bsp/bsp-ext'
 import {
   SourceFileTestCaseInfo,
   TestCaseInfo,
@@ -21,7 +22,7 @@ import {TestItemFactory} from '../test-info/test-item-factory'
 import {
   DocumentTestItem,
   LanguageToolManager,
-  TestFileContents,
+  LanguageTools,
 } from '../language-tools/manager'
 import {SyncHintDecorationsManager} from './decorator'
 
@@ -254,7 +255,6 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
         bsp.WorkspaceBuildTargets.type,
         cancellationToken
       )
-      this.store.cacheBuildTargetsResult(result)
     } catch (e) {
       if (e.code === CANCEL_ERROR_CODE) {
         updateDescription(
@@ -266,6 +266,33 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       updateDescription(parentTest, 'Error: unable to fetch targets')
       throw e
     }
+
+    const hasTestTargets = result.targets.some(target =>
+      Boolean(target.capabilities?.canTest)
+    )
+    if (!hasTestTargets) {
+      this.outputChannel.appendLine(
+        'No test targets reported by BSP server. Checking non-module targets.'
+      )
+      try {
+        const nonModuleResult = await conn.sendRequest(
+          bspExt.WorkspaceNonModuleTargets.type,
+          cancellationToken
+        )
+        const nonModuleTargets = nonModuleResult.nonModuleTargets.filter(
+          target => Boolean(target.capabilities?.canTest)
+        )
+        if (nonModuleTargets.length > 0) {
+          result = {targets: nonModuleTargets}
+        }
+      } catch (e) {
+        this.outputChannel.appendLine(
+          `Unable to fetch non-module targets: ${e}`
+        )
+      }
+    }
+
+    this.store.cacheBuildTargetsResult(result)
     await this.processWorkspaceBuildTargetsResult(parentTest, result)
   }
 
@@ -401,7 +428,13 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       }
     )
 
-    if (!result) {
+    if (!result || result.targets.length === 0) {
+      const manualTargetItem = this.findTargetForDocument(doc)
+      if (manualTargetItem) {
+        await this.resolveHandler(manualTargetItem)
+        return
+      }
+
       this.outputChannel.appendLine(
         `Unable to determine target for ${doc.fileName}.`
       )
@@ -418,6 +451,54 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     }
 
     this.syncHint.enable(doc.uri, this.repoRoot ?? '', docInfo)
+  }
+
+  private findTargetForDocument(
+    doc: vscode.TextDocument
+  ): vscode.TestItem | undefined {
+    const docPath = path.resolve(doc.uri.fsPath)
+
+    for (const targetItem of this.store.targetIdentifiers.values()) {
+      const target =
+        this.store.testCaseMetadata.get(targetItem)?.target ?? undefined
+      if (!target?.baseDirectory) continue
+
+      const baseDirPath = path.resolve(
+        vscode.Uri.parse(target.baseDirectory).fsPath
+      )
+      if (
+        docPath === baseDirPath ||
+        docPath.startsWith(baseDirPath + path.sep)
+      ) {
+        return targetItem
+      }
+    }
+
+    return undefined
+  }
+
+  private getTargetBaseDirectory(target: bsp.BuildTarget): string | undefined {
+    if (target.baseDirectory) {
+      return target.baseDirectory
+    }
+    if (!this.repoRoot) {
+      return undefined
+    }
+
+    const targetUri = target.id.uri
+    if (targetUri.startsWith('@') && !targetUri.startsWith('@//')) {
+      return undefined
+    }
+
+    const normalizedUri = targetUri.startsWith('@//')
+      ? targetUri.slice(1)
+      : targetUri
+    const match = normalizedUri.match(/^\/\/([^:]+)(?::.*)?$/)
+    if (!match) {
+      return undefined
+    }
+
+    return vscode.Uri.file(path.join(this.repoRoot, match[1])).toString()
   }
 
   /**
@@ -439,20 +520,39 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     const params: bsp.SourcesParams = {
       targets: [parentTarget.id],
     }
-    let result = await conn.sendRequest(
-      bsp.BuildTargetSources.type,
-      params,
-      cancellationToken
-    )
-
-    const hasSources = result.items.some(item => item.sources.length > 0)
     const languageTools =
       this.languageToolManager.getLanguageTools(parentTarget)
 
+    let result: bsp.SourcesResult | undefined
+    try {
+      result = await conn.sendRequest(
+        bsp.BuildTargetSources.type,
+        params,
+        cancellationToken
+      )
+    } catch (e) {
+      if (e.code !== CANCEL_ERROR_CODE) {
+        this.outputChannel.appendLine(
+          `Error fetching sources for ${parentTarget.id.uri}: ${e}`
+        )
+      }
+    }
+
+    if (!result) {
+      const inferredResult = this.inferSourcesWithFallback(
+        parentTarget,
+        languageTools
+      )
+      if (!inferredResult) return
+      result = inferredResult
+    }
+
+    const hasSources = result.items.some(item => item.sources.length > 0)
+
     if (!hasSources && parentTarget.dependencies.length === 0) {
-      const inferredResult = languageTools.inferSourcesFromTarget(
-        parentTarget.id.uri,
-        parentTarget.baseDirectory
+      const inferredResult = this.inferSourcesWithFallback(
+        parentTarget,
+        languageTools
       )
       if (inferredResult) {
         result = inferredResult
@@ -476,9 +576,9 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     const hasValidSources = result.items.some(item => item.sources.length > 0)
 
     if (!hasValidSources) {
-      const inferredResult = languageTools.inferSourcesFromTarget(
-        parentTarget.id.uri,
-        parentTarget.baseDirectory
+      const inferredResult = this.inferSourcesWithFallback(
+        parentTarget,
+        languageTools
       )
       if (inferredResult) {
         result = inferredResult
@@ -507,9 +607,9 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     const hasValidSources = result.items.some(item => item.sources.length > 0)
 
     if (!hasValidSources) {
-      const inferredResult = languageTools.inferSourcesFromTarget(
-        parentTarget.id.uri,
-        parentTarget.baseDirectory
+      const inferredResult = this.inferSourcesWithFallback(
+        parentTarget,
+        languageTools
       )
       if (inferredResult) {
         result = inferredResult
@@ -577,6 +677,18 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     updateDescription(parentTest)
   }
 
+  private inferSourcesWithFallback(
+    target: bsp.BuildTarget,
+    languageTools: LanguageTools
+  ): bsp.SourcesResult | undefined {
+    const baseDirectory = this.getTargetBaseDirectory(target)
+    let inferredResult = languageTools.inferSourcesFromTarget(
+      target.id.uri,
+      baseDirectory
+    )
+    return inferredResult
+  }
+
   private async resolveDocumentTestCases(
     parentTest: vscode.TestItem,
     cancellationToken?: vscode.CancellationToken
@@ -586,9 +698,13 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     if (!parentTestInfo?.target || parentTest.uri === undefined) return
 
     // Convert document contents into generic DocumentTestItem data.
-    const testFileContents = await this.languageToolManager
-      .getLanguageTools(parentTestInfo.target)
-      .getDocumentTestCases(parentTest.uri, this.repoRoot ?? '')
+    const languageTools = this.languageToolManager.getLanguageTools(
+      parentTestInfo.target
+    )
+    const testFileContents = await languageTools.getDocumentTestCases(
+      parentTest.uri,
+      this.repoRoot ?? ''
+    )
 
     // If document analysis has determined that it is not to be considered a test file, hide it.
     if (!testFileContents.isTestFile) {

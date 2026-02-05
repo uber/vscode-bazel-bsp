@@ -9,7 +9,7 @@ import {BaseLanguageTools} from './base'
 import {JUnitStyleTestCaseData, TestFinishDataKind} from '../bsp/bsp-ext'
 import * as bsp from '../bsp/bsp'
 
-const TEST_FILE_REGEX = /^.+\.(test|spec)\.ts$/
+const TEST_FILE_REGEX = /^.+\.(test|spec)\.tsx?$/
 
 export class TypeScriptLanguageTools
   extends BaseLanguageTools
@@ -18,7 +18,10 @@ export class TypeScriptLanguageTools
   isValidTestSource(uri: string): boolean {
     if (uri.includes('node_modules')) return false
     if (uri.includes('bazel-out')) return false
-    return true
+    const filePath = uri.startsWith('file:')
+      ? vscode.Uri.parse(uri).fsPath
+      : uri
+    return TEST_FILE_REGEX.test(path.basename(filePath))
   }
 
   getDebugRemoteRoot(
@@ -74,7 +77,33 @@ export class TypeScriptLanguageTools
     targetUri: string,
     baseDirectory: string | undefined
   ): bsp.SourcesResult | undefined {
-    if (!targetUri.endsWith('_jest') || !baseDirectory) {
+    if (!baseDirectory) {
+      return undefined
+    }
+
+    // Handle :test targets (web-code / Jazelle pattern)
+    if (targetUri.endsWith(':test')) {
+      const testFiles = this.findTestFilesInDirectory(baseDirectory)
+      if (testFiles.length > 0) {
+        return {
+          items: [
+            {
+              target: {uri: targetUri},
+              sources: testFiles.map(file => ({
+                uri: file,
+                kind: bsp.SourceItemKind.File,
+                generated: false,
+              })),
+              roots: [],
+            },
+          ],
+        }
+      }
+      return undefined
+    }
+
+    // Handle _jest targets (aspect_rules_jest pattern)
+    if (!targetUri.endsWith('_jest')) {
       return undefined
     }
 
@@ -112,6 +141,53 @@ export class TypeScriptLanguageTools
           roots: [],
         },
       ],
+    }
+  }
+
+  /**
+   * Recursively find all test files (*.test.ts, *.spec.ts, *.test.tsx, *.spec.tsx)
+   * in a directory. Used for web_test-style targets where tests are discovered
+   * by scanning.
+   */
+  private findTestFilesInDirectory(baseDirectory: string): string[] {
+    const testFiles: string[] = []
+    const normalizedDir = baseDirectory.startsWith('file://')
+      ? baseDirectory.slice(7)
+      : baseDirectory
+
+    try {
+      this.scanDirectoryForTests(normalizedDir, testFiles)
+    } catch {
+      // Directory may not exist or be inaccessible
+      return []
+    }
+
+    // Convert back to file:// URIs
+    return testFiles.map(file => `file://${file}`)
+  }
+
+  private scanDirectoryForTests(dir: string, results: string[]): void {
+    const entries = fs.readdirSync(dir, {withFileTypes: true})
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name)
+
+      // Skip node_modules and other non-relevant directories
+      if (entry.isDirectory()) {
+        if (
+          entry.name === 'node_modules' ||
+          entry.name === 'bazel-out' ||
+          entry.name === '.fusion' ||
+          entry.name === '__generated__' ||
+          entry.name === 'dist' ||
+          entry.name === 'coverage'
+        ) {
+          continue
+        }
+        this.scanDirectoryForTests(fullPath, results)
+      } else if (entry.isFile() && TEST_FILE_REGEX.test(entry.name)) {
+        results.push(fullPath)
+      }
     }
   }
   mapTestFinishDataToLookupKey(testFinishData: TestFinish): string | undefined {
