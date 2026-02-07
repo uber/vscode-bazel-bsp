@@ -14,9 +14,9 @@ jobs:
         # VS Code uses Node 18
         node-version: [18.x]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v6
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'yarn'
@@ -33,7 +33,7 @@ jobs:
     - name: Upload packaged extension artifact
       # Artifact is only uploaded on push to main, to preserve artifact storage capacity.
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: ${{ env.package_name_with_sha }}
         path: ${{ env.package_path }}
