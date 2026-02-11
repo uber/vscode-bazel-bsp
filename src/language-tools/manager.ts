@@ -33,7 +33,6 @@ export interface LanguageTools {
     baseDirectory: string | undefined
   ): bsp.SourcesResult | undefined
 }
-
 // Results from analyzing a test file.
 export type TestFileContents = {
   isTestFile: boolean
@@ -59,6 +58,12 @@ export class LanguageToolManager {
   private typescriptLanguageTools = new TypeScriptLanguageTools()
 
   getLanguageTools(target: BuildTarget | undefined): LanguageTools {
+    if (
+      target?.id?.uri?.endsWith(':test') &&
+      (!target.languageIds || target.languageIds.length === 0)
+    ) {
+      return this.typescriptLanguageTools
+    }
     if (target?.languageIds.find(val => val === 'typescript')) {
       return this.typescriptLanguageTools
     } else if (target?.languageIds.find(val => val === 'python')) {
