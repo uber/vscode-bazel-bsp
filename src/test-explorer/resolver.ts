@@ -428,13 +428,7 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
       }
     )
 
-    if (!result || result.targets.length === 0) {
-      const manualTargetItem = this.findTargetForDocument(doc)
-      if (manualTargetItem) {
-        await this.resolveHandler(manualTargetItem)
-        return
-      }
-
+    if (!result) {
       this.outputChannel.appendLine(
         `Unable to determine target for ${doc.fileName}.`
       )
@@ -451,30 +445,6 @@ export class TestResolver implements OnModuleInit, vscode.Disposable {
     }
 
     this.syncHint.enable(doc.uri, this.repoRoot ?? '', docInfo)
-  }
-
-  private findTargetForDocument(
-    doc: vscode.TextDocument
-  ): vscode.TestItem | undefined {
-    const docPath = path.resolve(doc.uri.fsPath)
-
-    for (const targetItem of this.store.targetIdentifiers.values()) {
-      const target =
-        this.store.testCaseMetadata.get(targetItem)?.target ?? undefined
-      if (!target?.baseDirectory) continue
-
-      const baseDirPath = path.resolve(
-        vscode.Uri.parse(target.baseDirectory).fsPath
-      )
-      if (
-        docPath === baseDirPath ||
-        docPath.startsWith(baseDirPath + path.sep)
-      ) {
-        return targetItem
-      }
-    }
-
-    return undefined
   }
 
   private getTargetBaseDirectory(target: bsp.BuildTarget): string | undefined {

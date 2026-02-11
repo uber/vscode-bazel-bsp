@@ -81,7 +81,7 @@ export class TypeScriptLanguageTools
       return undefined
     }
 
-    // Handle :test targets (web_test / Jazelle pattern)
+    // Handle :test targets (web_test pattern)
     if (targetUri.endsWith(':test')) {
       const testFiles = this.findTestFilesInDirectory(baseDirectory)
       if (testFiles.length > 0) {
