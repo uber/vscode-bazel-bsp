@@ -233,12 +233,18 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
     if (this.target === undefined) return
 
     const params = super.prepareTestRunParams(currentRun)
-    if (
-      params?.dataKind === TestParamsDataKind.BazelTest &&
-      this.details?.testFilter
-    ) {
+    if (params?.dataKind === TestParamsDataKind.BazelTest && this.details) {
       const bazelParams = params.data as BazelTestParamsData
-      bazelParams.testFilter = this.details.testFilter
+      if (this.details.testFilter) {
+        bazelParams.testFilter = this.details.testFilter
+      }
+      if (this.details.additionalBazelParams) {
+        if (bazelParams.additionalBazelParams) {
+          bazelParams.additionalBazelParams += ` ${this.details.additionalBazelParams}`
+        } else {
+          bazelParams.additionalBazelParams = this.details.additionalBazelParams
+        }
+      }
     }
 
     return params
