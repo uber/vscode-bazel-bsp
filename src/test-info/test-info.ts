@@ -110,33 +110,28 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
   prepareTestRunParams(currentRun: TestRunTracker): TestParams | undefined {
     if (this.target === undefined) return
 
-    const runProfileKind = currentRun.getRunProfileKind()
-    const isCoverageRun = runProfileKind === vscode.TestRunProfileKind.Coverage
     const bazelParams: BazelTestParamsData = {
-      coverage: isCoverageRun,
-    }
-
-    const appendBazelParams = (params: string) => {
-      if (!params) return
-      if (bazelParams.additionalBazelParams) {
-        bazelParams.additionalBazelParams += ` ${params}`
-      } else {
-        bazelParams.additionalBazelParams = params
-      }
+      coverage:
+        currentRun.getRunProfileKind() === vscode.TestRunProfileKind.Coverage,
     }
 
     // Includes additional debug-specific flags when necessary.
-    if (runProfileKind === vscode.TestRunProfileKind.Debug) {
+    if (currentRun.getRunProfileKind() === vscode.TestRunProfileKind.Debug) {
       const configuredFlags = currentRun.getDebugBazelFlags()
       if (configuredFlags && configuredFlags.length > 0) {
         // Bazel BSP accepts whitespace separated list of flags.
-        appendBazelParams(configuredFlags.join(' '))
+        bazelParams.additionalBazelParams = configuredFlags.join(' ')
       }
     }
 
+    // Additional Bazel params is not supported in BSP coverage for now
     const ideTag = currentRun.getIdeTag()
-    if (ideTag) {
-      appendBazelParams(ideTag)
+    if (ideTag && !bazelParams.coverage) {
+      if (bazelParams.additionalBazelParams) {
+        bazelParams.additionalBazelParams += ` ${ideTag}`
+      } else {
+        bazelParams.additionalBazelParams = ideTag
+      }
     }
 
     const params = {
@@ -294,64 +289,12 @@ export class TestItemTestCaseInfo extends SourceFileTestCaseInfo {
     this.details = details
   }
 
-  prepareTestRunParams(currentRun: TestRunTracker): TestParams | undefined {
-    const params = super.prepareTestRunParams(currentRun)
-    if (
-      params?.dataKind !== TestParamsDataKind.BazelTest ||
-      this.details === undefined
-    ) {
-      return params
-    }
-
-    if (!this.shouldUseJestTestNamePattern()) {
-      return params
-    }
-
-    const lookupKey =
-      this.details.lookupKey ?? this.details.testFilter ?? this.details.name
-    if (!lookupKey) {
-      return params
-    }
-
-    const bazelParams = params.data as BazelTestParamsData
-    const appendBazelParams = (flags: string) => {
-      if (!flags) return
-      if (bazelParams.additionalBazelParams) {
-        bazelParams.additionalBazelParams += ` ${flags}`
-      } else {
-        bazelParams.additionalBazelParams = flags
-      }
-    }
-
-    appendBazelParams(
-      `--test_arg=--testNamePattern=${this.buildJestTestNamePattern(lookupKey)}`
-    )
-
-    return params
-  }
-
   /**
    * Sets a test case's label to its name.
    * @param relativeToItem will be ignored in this implementation
    */
   setDisplayName(relativeToItem?: TestCaseInfo | undefined) {
     this.testItem.label = this.details.name
-  }
-
-  private shouldUseJestTestNamePattern(): boolean {
-    const languageIds = this.target.languageIds ?? []
-    if (
-      languageIds.includes('typescript') ||
-      languageIds.includes('javascript')
-    ) {
-      return true
-    }
-    return languageIds.length === 0 && this.target.id.uri.endsWith(':test')
-  }
-
-  private buildJestTestNamePattern(name: string): string {
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    return escaped.replace(/\s+/g, '.*')
   }
 }
 
