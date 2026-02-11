@@ -134,6 +134,15 @@ export class TypeScriptLanguageTools
     return data?.lookupKey
   }
 
+  private buildJestTestNamePattern(name: string): string {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return escaped.replace(/\s+/g, '.*')
+  }
+
+  private buildJestAdditionalBazelParams(name: string): string {
+    return `--test_arg=--testNamePattern=${this.buildJestTestNamePattern(name)}`
+  }
+
   async getDocumentTestCases(
     document: vscode.Uri,
     workspaceRoot: string
@@ -196,6 +205,7 @@ export class TypeScriptLanguageTools
           testFilter: describeName,
           parent: parent,
           lookupKey: lookupKey,
+          additionalBazelParams: this.buildJestAdditionalBazelParams(lookupKey),
         }
         testCases.push(describeItem)
         describeStack.push(describeItem)
@@ -223,6 +233,7 @@ export class TypeScriptLanguageTools
           testFilter: testName,
           parent: parent,
           lookupKey: lookupKey,
+          additionalBazelParams: this.buildJestAdditionalBazelParams(lookupKey),
         }
         testCases.push(testItem)
       }

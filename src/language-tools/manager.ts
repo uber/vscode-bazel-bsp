@@ -47,6 +47,7 @@ export type DocumentTestItem = {
   range: vscode.Range
   uri: vscode.Uri
   testFilter: string
+  additionalBazelParams?: string
   parent?: DocumentTestItem
   lookupKey?: string
 }
