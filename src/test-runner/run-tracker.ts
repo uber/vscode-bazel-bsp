@@ -1,6 +1,11 @@
 import * as vscode from 'vscode'
+import * as path from 'path'
 
-import {TestCaseInfo, TestItemType} from '../test-info/test-info'
+import {
+  SourceFileTestCaseInfo,
+  TestCaseInfo,
+  TestItemType,
+} from '../test-info/test-info'
 import {
   BuildTarget,
   LogMessageParams,
@@ -88,6 +93,7 @@ export class TestRunTracker implements TaskOriginHandlers {
     this.ideTag = 'unknown'
 
     this.prepareCurrentRun()
+    this.prepareCoverageScope()
     this.prepareDebugInfo()
   }
 
@@ -290,6 +296,38 @@ export class TestRunTracker implements TaskOriginHandlers {
 
   public getDebugBazelFlags(): string[] | undefined {
     return this.debugInfo?.debugFlags
+  }
+
+  private prepareCoverageScope() {
+    if (this.getRunProfileKind() !== vscode.TestRunProfileKind.Coverage) {
+      return
+    }
+    if (!this.request.include || this.request.include.length !== 1) {
+      return
+    }
+
+    const includedItem = this.request.include[0]
+    const info = this.testCaseMetadata.get(includedItem)
+    if (!info) {
+      return
+    }
+
+    let rootDir: string | undefined
+    if (info.target?.baseDirectory) {
+      rootDir = vscode.Uri.parse(info.target.baseDirectory).fsPath
+    } else if (info instanceof SourceFileTestCaseInfo) {
+      const documentUri =
+        info.getDocumentTestItem()?.uri ?? includedItem.uri ?? undefined
+      if (documentUri) {
+        rootDir = path.dirname(documentUri.fsPath)
+      }
+    }
+
+    if (!rootDir) {
+      return
+    }
+
+    this.coverageTracker.setCoverageRoots(this.run, [rootDir])
   }
 
   /**
