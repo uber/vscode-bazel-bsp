@@ -59,7 +59,11 @@ export class LanguageToolManager {
   private typescriptLanguageTools = new TypeScriptLanguageTools()
 
   getLanguageTools(target: BuildTarget | undefined): LanguageTools {
-    if (target?.languageIds.find(val => val === 'typescript')) {
+    if (
+      target?.languageIds.find(
+        val => val === 'typescript' || val === 'typescriptreact'
+      )
+    ) {
       return this.typescriptLanguageTools
     } else if (target?.languageIds.find(val => val === 'python')) {
       return this.pythonLanguageTools
@@ -70,7 +74,10 @@ export class LanguageToolManager {
   }
 
   getLanguageToolsForFile(document: vscode.TextDocument): LanguageTools {
-    if (document.languageId === 'typescript') {
+    if (
+      document.languageId === 'typescript' ||
+      document.languageId === 'typescriptreact'
+    ) {
       return this.typescriptLanguageTools
     } else if (document.languageId === 'python') {
       return this.pythonLanguageTools

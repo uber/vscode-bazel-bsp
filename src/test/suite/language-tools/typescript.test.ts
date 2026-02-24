@@ -40,6 +40,95 @@ suite('TypeScript Language Tools', () => {
     assert.strictEqual(result.testCases.length, 0)
   })
 
+  test('tsx browser test file', async () => {
+    const sampleFileContent = `
+describe('Object Type', () => {
+  it('renders object type page', () => {
+    expect(true).toBe(true)
+  })
+})
+`
+    const testFilePath = path.join(tempDir, 'object-type.browser.tsx')
+    fs.writeFileSync(testFilePath, sampleFileContent)
+
+    const result = await languageTools.getDocumentTestCases(
+      vscode.Uri.file(testFilePath),
+      tempDir
+    )
+
+    assert.strictEqual(result.isTestFile, true)
+    assert.strictEqual(result.testCases.length, 2)
+  })
+
+  test('node test file', async () => {
+    const sampleFileContent = `
+describe('Handlers', () => {
+  test('returns expected response', () => {
+    expect(true).toBe(true)
+  })
+})
+`
+    const testFilePath = path.join(tempDir, 'handlers.node.ts')
+    fs.writeFileSync(testFilePath, sampleFileContent)
+
+    const result = await languageTools.getDocumentTestCases(
+      vscode.Uri.file(testFilePath),
+      tempDir
+    )
+
+    assert.strictEqual(result.isTestFile, true)
+    assert.strictEqual(result.testCases.length, 2)
+  })
+
+  test('spec tsx file', async () => {
+    const sampleFileContent = `
+describe('Component', () => {
+  it('renders', () => {
+    expect(true).toBe(true)
+  })
+})
+`
+    const testFilePath = path.join(tempDir, 'component.spec.tsx')
+    fs.writeFileSync(testFilePath, sampleFileContent)
+
+    const result = await languageTools.getDocumentTestCases(
+      vscode.Uri.file(testFilePath),
+      tempDir
+    )
+
+    assert.strictEqual(result.isTestFile, true)
+    assert.strictEqual(result.testCases.length, 2)
+  })
+
+  test('browser ts file', async () => {
+    const sampleFileContent = `
+describe('Feature', () => {
+  test('works in browser', () => {
+    expect(true).toBe(true)
+  })
+})
+`
+    const testFilePath = path.join(tempDir, 'feature.browser.ts')
+    fs.writeFileSync(testFilePath, sampleFileContent)
+
+    const result = await languageTools.getDocumentTestCases(
+      vscode.Uri.file(testFilePath),
+      tempDir
+    )
+
+    assert.strictEqual(result.isTestFile, true)
+    assert.strictEqual(result.testCases.length, 2)
+  })
+
+  test('non-test tsx file', async () => {
+    const result = await languageTools.getDocumentTestCases(
+      vscode.Uri.parse('file:///repo/root/sample/component.tsx'),
+      '/repo/root/'
+    )
+    assert.strictEqual(result.isTestFile, false)
+    assert.strictEqual(result.testCases.length, 0)
+  })
+
   test('parses describe and it blocks', async () => {
     const sampleFileContent = `
 describe('UserService', () => {

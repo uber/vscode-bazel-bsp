@@ -88,9 +88,30 @@ suite('Language Tools Manager', () => {
     assert.strictEqual(result.constructor.name, 'TypeScriptLanguageTools')
   })
 
+  test('get tools, typescriptreact', async () => {
+    const target: BuildTarget = {
+      id: {
+        uri: '@@//sample:target',
+      },
+      tags: [],
+      languageIds: ['typescriptreact'],
+      dependencies: [],
+      capabilities: {},
+    }
+    const result = languageTools.getLanguageTools(target)
+    assert.strictEqual(result.constructor.name, 'TypeScriptLanguageTools')
+  })
+
   test('get tools for file, typescript', async () => {
     const result = languageTools.getLanguageToolsForFile({
       languageId: 'typescript',
+    } as any)
+    assert.strictEqual(result.constructor.name, 'TypeScriptLanguageTools')
+  })
+
+  test('get tools for file, typescriptreact', async () => {
+    const result = languageTools.getLanguageToolsForFile({
+      languageId: 'typescriptreact',
     } as any)
     assert.strictEqual(result.constructor.name, 'TypeScriptLanguageTools')
   })
