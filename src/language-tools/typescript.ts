@@ -9,7 +9,7 @@ import {BaseLanguageTools} from './base'
 import {JUnitStyleTestCaseData, TestFinishDataKind} from '../bsp/bsp-ext'
 import * as bsp from '../bsp/bsp'
 
-const TEST_FILE_REGEX = /^.+\.(test|spec)\.ts$/
+const TEST_FILE_REGEX = /^.+\.(test|spec|browser|node)\.tsx?$/
 
 export class TypeScriptLanguageTools
   extends BaseLanguageTools
