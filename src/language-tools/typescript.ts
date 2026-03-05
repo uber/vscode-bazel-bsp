@@ -61,11 +61,11 @@ export class TypeScriptLanguageTools
       pathComponents.push(packagePath)
     }
 
-    pathComponents.push(
-      `${targetName}_`,
-      `${targetName}.runfiles`,
-      workspaceName
-    )
+    const nestedDir = path.join(...pathComponents, `${targetName}_`)
+    if (fs.existsSync(nestedDir)) {
+      pathComponents.push(`${targetName}_`)
+    }
+    pathComponents.push(`${targetName}.runfiles`, workspaceName)
 
     return pathComponents.join('/').replace(/\/+/g, '/')
   }

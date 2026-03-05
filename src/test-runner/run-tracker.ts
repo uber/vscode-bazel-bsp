@@ -73,7 +73,6 @@ export class TestRunTracker implements TaskOriginHandlers {
   private pending: Thenable<void>[] = []
   private buildTaskTracker: TaskEventTracker = new TaskEventTracker()
   private debugInfo: DebugInfo | undefined
-  private hasDebugSessionBeenInitiated = false
   private ideTag: string
   constructor(params: RunTrackerParams) {
     this.allTests = new Map<TestItemType, TestCaseInfo[]>()
@@ -236,32 +235,63 @@ export class TestRunTracker implements TaskOriginHandlers {
       this.run.appendOutput('\n\r')
     }
 
-    // During debug runs, watch each message for indication of debug readiness.
-    // If the message matches the configured pattern, start the debug session.
     if (
       this.debugInfo?.launchConfig &&
-      this.debugInfo.readyPattern?.test(params.message) &&
-      !this.hasDebugSessionBeenInitiated
+      this.debugInfo.readyPattern?.test(params.message)
     ) {
-      this.hasDebugSessionBeenInitiated = true
-      this.run.appendOutput(
-        `Starting remote debug session [Launch config: '${this.debugInfo.launchConfig.name}']\r\n`
-      )
-
-      const debugConfig = {...this.debugInfo.launchConfig}
-      if (this.debugInfo.localRoot && this.debugInfo.remoteRoot) {
-        debugConfig.localRoot = this.debugInfo.localRoot
-        debugConfig.remoteRoot = this.debugInfo.remoteRoot
-        this.run.appendOutput(
-          `Debug paths:\r\n  localRoot: ${debugConfig.localRoot}\r\n  remoteRoot: ${debugConfig.remoteRoot}\r\n`
-        )
+      const match = params.message.match(/ws:\/\/([^:]+):(\d+)\//)
+      if (match) {
+        this.attachDebugger({host: match[1], port: parseInt(match[2], 10)})
       }
+    }
+  }
 
-      vscode.debug.startDebugging(
-        vscode.workspace.workspaceFolders?.[0],
-        debugConfig
+  /**
+   * In multi-process environments (e.g. Jazelle/Bazel), wrapper processes
+   * emit debug endpoints before the real test runner. With --inspect-brk,
+   * each process pauses at startup. When a new endpoint appears, we
+   * resume the current wrapper and re-attach to the new one. The last
+   * endpoint is the real test process where breakpoints will be hit.
+   */
+  private async attachDebugger(endpoint: {
+    host: string
+    port: number
+  }): Promise<void> {
+    if (!this.debugInfo?.launchConfig) return
+
+    this.run.appendOutput(
+      `Debug endpoint detected: ${endpoint.host}:${endpoint.port}\r\n`
+    )
+
+    const session = vscode.debug.activeDebugSession
+    if (session) {
+      try {
+        await session.customRequest('continue', {threadId: 1})
+      } catch {
+        // Wrapper process may have already exited
+      }
+      await vscode.debug.stopDebugging(session)
+    }
+
+    this.run.appendOutput(
+      `Attaching debugger to ${endpoint.host}:${endpoint.port} [Launch config: '${this.debugInfo.launchConfig.name}']\r\n`
+    )
+
+    const debugConfig = {...this.debugInfo.launchConfig}
+    debugConfig.port = endpoint.port
+    debugConfig.address = endpoint.host
+    if (this.debugInfo.localRoot && this.debugInfo.remoteRoot) {
+      debugConfig.localRoot = this.debugInfo.localRoot
+      debugConfig.remoteRoot = this.debugInfo.remoteRoot
+      this.run.appendOutput(
+        `Debug paths:\r\n  localRoot: ${debugConfig.localRoot}\r\n  remoteRoot: ${debugConfig.remoteRoot}\r\n`
       )
     }
+
+    await vscode.debug.startDebugging(
+      vscode.workspace.workspaceFolders?.[0],
+      debugConfig
+    )
   }
 
   /**
