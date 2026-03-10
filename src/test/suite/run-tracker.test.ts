@@ -456,7 +456,7 @@ suite('Test Run Tracker', () => {
       .withArgs(settings.SettingName.LAUNCH_CONFIG_NAME)
       .returns('myLaunchConfig')
       .withArgs(settings.SettingName.DEBUG_READY_PATTERN)
-      .returns('^Ready to Debug')
+      .returns('Debugger listening on')
       .withArgs(settings.SettingName.DEBUG_BAZEL_FLAGS)
       .returns(['--my_flag_1', '--my_flag_2'])
 
@@ -485,7 +485,7 @@ suite('Test Run Tracker', () => {
       coverageTracker: coverageTracker,
     })
 
-    // Send sample messages.
+    // Send sample messages. Second message matches the debug readiness pattern.
     const sampleMessages: LogMessageParams[] = [
       {
         type: MessageType.Info,
@@ -495,7 +495,7 @@ suite('Test Run Tracker', () => {
       {
         type: MessageType.Info,
         originId: 'sample',
-        message: 'Ready to Debug on port 5000', // Matches debug readiness pattern in sample settings.
+        message: 'Debugger listening on ws://127.0.0.1:9229/abc-def',
       },
       {
         type: MessageType.Info,
@@ -508,23 +508,97 @@ suite('Test Run Tracker', () => {
       testRunnerWithDebug.onBuildLogMessage(params)
     }
 
-    // Call for each message, plus newline sequences and debug start message.
-    assert.equal(runSpy.appendOutput.callCount, 7)
-    assert.equal(
+    // Verify debug attach output messages are present.
+    assert.ok(
       runSpy.appendOutput
         .getCalls()
-        .filter(call => call.args[0].includes('Starting remote debug session'))
-        .length,
-      1
+        .some(call => call.args[0].includes('Debug endpoint detected')),
+      'Expected debug endpoint detected message'
+    )
+    assert.ok(
+      runSpy.appendOutput
+        .getCalls()
+        .some(call => call.args[0].includes('Attaching debugger to')),
+      'Expected attaching debugger message'
     )
 
-    // Ensure that debug session is started with correct launch config.
+    // Ensure that debug session is started with the parsed endpoint.
     assert.strictEqual(startDebuggingStub.callCount, 1)
-    sinon.assert.calledWithExactly(
-      startDebuggingStub,
-      vscode.workspace.workspaceFolders?.[0],
-      fakeLaunchConfig
+    const debugConfig = startDebuggingStub.getCall(0).args[1]
+    assert.strictEqual(debugConfig.port, 9229)
+    assert.strictEqual(debugConfig.address, '127.0.0.1')
+  })
+
+  test('debug session, launches configured profile when no ws endpoint is present', async () => {
+    settingsStub
+      .withArgs(settings.SettingName.DEBUG_ENABLED)
+      .returns(true)
+      .withArgs(settings.SettingName.LAUNCH_CONFIG_NAME)
+      .returns('myLaunchConfig')
+      .withArgs(settings.SettingName.DEBUG_READY_PATTERN)
+      .returns('^Ready to Debug')
+      .withArgs(settings.SettingName.DEBUG_BAZEL_FLAGS)
+      .returns(['--my_flag_1', '--my_flag_2'])
+
+    const startDebuggingStub = sandbox
+      .stub(vscode.debug, 'startDebugging')
+      .resolves(true)
+
+    const debugRunProfile = testController.createRunProfile(
+      'sample',
+      vscode.TestRunProfileKind.Debug,
+      () => {}
     )
+    const request = new vscode.TestRunRequest([], [], debugRunProfile)
+    const run = testController.createTestRun(request)
+    runSpy = sandbox.spy(run)
+
+    const testRunnerWithDebug = new TestRunTracker({
+      testCaseMetadata: metadata,
+      run: run,
+      request: request,
+      originName: 'sample',
+      cancelToken: cancelTokenSource.token,
+      languageToolManager: languageToolStub,
+      coverageTracker: coverageTracker,
+    })
+
+    const sampleMessages: LogMessageParams[] = [
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'sample log message',
+      },
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'Ready to Debug on port 5000',
+      },
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'sample log message3',
+      },
+    ]
+
+    for (const params of sampleMessages) {
+      testRunnerWithDebug.onBuildLogMessage(params)
+    }
+
+    assert.ok(
+      runSpy.appendOutput
+        .getCalls()
+        .some(call =>
+          call.args[0].includes('Starting remote debug session [Launch config')
+        ),
+      'Expected configured launch config debug start message'
+    )
+
+    // Launches once using the configured profile, without overriding port/address.
+    assert.strictEqual(startDebuggingStub.callCount, 1)
+    const debugConfig = startDebuggingStub.getCall(0).args[1]
+    assert.strictEqual(debugConfig.port, undefined)
+    assert.strictEqual(debugConfig.address, undefined)
   })
 
   test('debug session, invalid launch config', async () => {
@@ -601,7 +675,91 @@ suite('Test Run Tracker', () => {
     assert.strictEqual(startDebuggingStub.callCount, 0)
   })
 
-  test('debug session, only starts on first ready pattern match', async () => {
+  test('debug session, keeps active session when continue fails during reattach', async () => {
+    settingsStub
+      .withArgs(settings.SettingName.DEBUG_ENABLED)
+      .returns(true)
+      .withArgs(settings.SettingName.LAUNCH_CONFIG_NAME)
+      .returns('myLaunchConfig')
+      .withArgs(settings.SettingName.DEBUG_READY_PATTERN)
+      .returns('Debugger listening on')
+      .withArgs(settings.SettingName.DEBUG_BAZEL_FLAGS)
+      .returns(['--my_flag_1', '--my_flag_2'])
+
+    const startDebuggingStub = sandbox
+      .stub(vscode.debug, 'startDebugging')
+      .resolves(true)
+    const stopDebuggingStub = sandbox
+      .stub(vscode.debug, 'stopDebugging')
+      .resolves()
+
+    const fakeSession = {
+      customRequest: sandbox.stub().rejects(new Error('not supported')),
+    }
+    let sessionActive = false
+    sandbox
+      .stub(vscode.debug, 'activeDebugSession')
+      .get(() => (sessionActive ? fakeSession : undefined))
+    startDebuggingStub.callsFake(async () => {
+      sessionActive = true
+      return true
+    })
+
+    const debugRunProfile = testController.createRunProfile(
+      'sample',
+      vscode.TestRunProfileKind.Debug,
+      () => {}
+    )
+    const request = new vscode.TestRunRequest([], [], debugRunProfile)
+    const run = testController.createTestRun(request)
+    runSpy = sandbox.spy(run)
+
+    const testRunnerWithDebug = new TestRunTracker({
+      testCaseMetadata: metadata,
+      run: run,
+      request: request,
+      originName: 'sample',
+      cancelToken: cancelTokenSource.token,
+      languageToolManager: languageToolStub,
+      coverageTracker: coverageTracker,
+    })
+
+    const sampleMessages: LogMessageParams[] = [
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'Debugger listening on ws://127.0.0.1:9229/abc-def',
+      },
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'Debugger listening on ws://127.0.0.1:9230/ghi-jkl',
+      },
+    ]
+
+    for (const params of sampleMessages) {
+      testRunnerWithDebug.onBuildLogMessage(params)
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    // First endpoint attaches normally; second triggers reattach which fails continue.
+    assert.strictEqual(startDebuggingStub.callCount, 1)
+    // Session should NOT be stopped when continue fails.
+    assert.strictEqual(stopDebuggingStub.callCount, 0)
+    assert.ok(
+      runSpy.appendOutput
+        .getCalls()
+        .some(call =>
+          call.args[0].includes(
+            'Unable to resume active debug session for reattach'
+          )
+        ),
+      'Expected warning about failed continue'
+    )
+  })
+
+  test('debug session, reattaches on each new endpoint', async () => {
     // Debug enabled in this test case, and valid settings present.
     settingsStub
       .withArgs(settings.SettingName.DEBUG_ENABLED)
@@ -609,13 +767,29 @@ suite('Test Run Tracker', () => {
       .withArgs(settings.SettingName.LAUNCH_CONFIG_NAME)
       .returns('myLaunchConfig')
       .withArgs(settings.SettingName.DEBUG_READY_PATTERN)
-      .returns('^Ready to Debug')
+      .returns('Debugger listening on')
       .withArgs(settings.SettingName.DEBUG_BAZEL_FLAGS)
       .returns(['--my_flag_1', '--my_flag_2'])
 
     const startDebuggingStub = sandbox
       .stub(vscode.debug, 'startDebugging')
       .resolves(true)
+    const stopDebuggingStub = sandbox
+      .stub(vscode.debug, 'stopDebugging')
+      .resolves()
+
+    // Simulate activeDebugSession becoming available after first attach.
+    const fakeSession = {
+      customRequest: sandbox.stub().resolves(),
+    }
+    let sessionActive = false
+    sandbox
+      .stub(vscode.debug, 'activeDebugSession')
+      .get(() => (sessionActive ? fakeSession : undefined))
+    startDebuggingStub.callsFake(async () => {
+      sessionActive = true
+      return true
+    })
 
     // Set up test run tracker configured in debug mode.
     const debugRunProfile = testController.createRunProfile(
@@ -638,7 +812,7 @@ suite('Test Run Tracker', () => {
       coverageTracker: coverageTracker,
     })
 
-    // Send sample messages with multiple ready pattern matches.
+    // Send sample messages with multiple debug endpoints.
     const sampleMessages: LogMessageParams[] = [
       {
         type: MessageType.Info,
@@ -648,7 +822,7 @@ suite('Test Run Tracker', () => {
       {
         type: MessageType.Info,
         originId: 'sample',
-        message: 'Ready to Debug on port 5000', // First match
+        message: 'Debugger listening on ws://127.0.0.1:9229/abc-def', // First endpoint
       },
       {
         type: MessageType.Info,
@@ -658,7 +832,7 @@ suite('Test Run Tracker', () => {
       {
         type: MessageType.Info,
         originId: 'sample',
-        message: 'Ready to Debug on port 5000', // Second match - should be ignored
+        message: 'Debugger listening on ws://127.0.0.1:9230/ghi-jkl', // Second endpoint - triggers reattach
       },
     ]
 
@@ -666,22 +840,98 @@ suite('Test Run Tracker', () => {
       testRunnerWithDebug.onBuildLogMessage(params)
     }
 
-    // Call for each message, plus newline sequences and debug start message.
-    assert.equal(runSpy.appendOutput.callCount, 9)
-    assert.equal(
-      runSpy.appendOutput
-        .getCalls()
-        .filter(call => call.args[0].includes('Starting remote debug session'))
-        .length,
-      1
-    )
+    // Flush async attach operations.
+    await new Promise(resolve => setTimeout(resolve, 50))
 
-    // Ensure that debug session is started only once with correct launch config.
-    assert.strictEqual(startDebuggingStub.callCount, 1)
-    sinon.assert.calledWithExactly(
-      startDebuggingStub,
-      vscode.workspace.workspaceFolders?.[0],
-      fakeLaunchConfig
+    // Ensure that debug session is started once per endpoint.
+    assert.strictEqual(startDebuggingStub.callCount, 2)
+
+    const firstConfig = startDebuggingStub.getCall(0).args[1]
+    assert.strictEqual(firstConfig.port, 9229)
+    assert.strictEqual(firstConfig.address, '127.0.0.1')
+
+    const secondConfig = startDebuggingStub.getCall(1).args[1]
+    assert.strictEqual(secondConfig.port, 9230)
+    assert.strictEqual(secondConfig.address, '127.0.0.1')
+
+    // Previous session should be stopped before reattaching.
+    assert.ok(
+      stopDebuggingStub.called,
+      'Expected previous session to be stopped before reattach'
     )
+  })
+
+  test('debug session, skips reattach when endpoint is unchanged', async () => {
+    settingsStub
+      .withArgs(settings.SettingName.DEBUG_ENABLED)
+      .returns(true)
+      .withArgs(settings.SettingName.LAUNCH_CONFIG_NAME)
+      .returns('myLaunchConfig')
+      .withArgs(settings.SettingName.DEBUG_READY_PATTERN)
+      .returns('Debugger listening on')
+      .withArgs(settings.SettingName.DEBUG_BAZEL_FLAGS)
+      .returns(['--my_flag_1', '--my_flag_2'])
+
+    const startDebuggingStub = sandbox
+      .stub(vscode.debug, 'startDebugging')
+      .resolves(true)
+    const stopDebuggingStub = sandbox
+      .stub(vscode.debug, 'stopDebugging')
+      .resolves()
+
+    const fakeSession = {
+      customRequest: sandbox.stub().resolves(),
+    }
+    let sessionActive = false
+    sandbox
+      .stub(vscode.debug, 'activeDebugSession')
+      .get(() => (sessionActive ? fakeSession : undefined))
+    startDebuggingStub.callsFake(async () => {
+      sessionActive = true
+      return true
+    })
+
+    const debugRunProfile = testController.createRunProfile(
+      'sample',
+      vscode.TestRunProfileKind.Debug,
+      () => {}
+    )
+    const request = new vscode.TestRunRequest([], [], debugRunProfile)
+    const run = testController.createTestRun(request)
+    runSpy = sandbox.spy(run)
+
+    const testRunnerWithDebug = new TestRunTracker({
+      testCaseMetadata: metadata,
+      run: run,
+      request: request,
+      originName: 'sample',
+      cancelToken: cancelTokenSource.token,
+      languageToolManager: languageToolStub,
+      coverageTracker: coverageTracker,
+    })
+
+    // Same endpoint appears twice.
+    const sampleMessages: LogMessageParams[] = [
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'Debugger listening on ws://127.0.0.1:9229/abc-def',
+      },
+      {
+        type: MessageType.Info,
+        originId: 'sample',
+        message: 'Debugger listening on ws://127.0.0.1:9229/abc-def',
+      },
+    ]
+
+    for (const params of sampleMessages) {
+      testRunnerWithDebug.onBuildLogMessage(params)
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    // Should attach only once — second identical endpoint is skipped.
+    assert.strictEqual(startDebuggingStub.callCount, 1)
+    assert.strictEqual(stopDebuggingStub.callCount, 0)
   })
 })
