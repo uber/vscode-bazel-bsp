@@ -73,6 +73,8 @@ export class TestRunTracker implements TaskOriginHandlers {
   private pending: Thenable<void>[] = []
   private buildTaskTracker: TaskEventTracker = new TaskEventTracker()
   private debugInfo: DebugInfo | undefined
+  private hasDebugSessionBeenInitiated = false
+  private lastAttachedEndpoint: string | undefined
   private ideTag: string
   constructor(params: RunTrackerParams) {
     this.allTests = new Map<TestItemType, TestCaseInfo[]>()
@@ -242,6 +244,8 @@ export class TestRunTracker implements TaskOriginHandlers {
       const match = params.message.match(/ws:\/\/([^:]+):(\d+)\//)
       if (match) {
         this.attachDebugger({host: match[1], port: parseInt(match[2], 10)})
+      } else {
+        this.startConfiguredDebugSession()
       }
     }
   }
@@ -259,6 +263,10 @@ export class TestRunTracker implements TaskOriginHandlers {
   }): Promise<void> {
     if (!this.debugInfo?.launchConfig) return
 
+    const endpointKey = `${endpoint.host}:${endpoint.port}`
+    if (this.lastAttachedEndpoint === endpointKey) return
+    this.lastAttachedEndpoint = endpointKey
+
     this.run.appendOutput(
       `Debug endpoint detected: ${endpoint.host}:${endpoint.port}\r\n`
     )
@@ -268,7 +276,11 @@ export class TestRunTracker implements TaskOriginHandlers {
       try {
         await session.customRequest('continue', {threadId: 1})
       } catch {
-        // Wrapper process may have already exited
+        this.run.appendOutput(
+          'Unable to resume active debug session for reattach. Keeping current session.\r\n'
+        )
+        this.lastAttachedEndpoint = undefined
+        return
       }
       await vscode.debug.stopDebugging(session)
     }
@@ -289,6 +301,36 @@ export class TestRunTracker implements TaskOriginHandlers {
     }
 
     await vscode.debug.startDebugging(
+      vscode.workspace.workspaceFolders?.[0],
+      debugConfig
+    )
+  }
+
+  /**
+   * Fallback for non-Node debug flows (Java, Python, etc.) where the ready
+   * pattern matches but the log message doesn't contain a ws:// endpoint.
+   * Launches the configured debug profile once using its existing settings.
+   */
+  private startConfiguredDebugSession(): void {
+    if (!this.debugInfo?.launchConfig || this.hasDebugSessionBeenInitiated) {
+      return
+    }
+    this.hasDebugSessionBeenInitiated = true
+
+    this.run.appendOutput(
+      `Starting remote debug session [Launch config: '${this.debugInfo.launchConfig.name}']\r\n`
+    )
+
+    const debugConfig = {...this.debugInfo.launchConfig}
+    if (this.debugInfo.localRoot && this.debugInfo.remoteRoot) {
+      debugConfig.localRoot = this.debugInfo.localRoot
+      debugConfig.remoteRoot = this.debugInfo.remoteRoot
+      this.run.appendOutput(
+        `Debug paths:\r\n  localRoot: ${debugConfig.localRoot}\r\n  remoteRoot: ${debugConfig.remoteRoot}\r\n`
+      )
+    }
+
+    vscode.debug.startDebugging(
       vscode.workspace.workspaceFolders?.[0],
       debugConfig
     )
