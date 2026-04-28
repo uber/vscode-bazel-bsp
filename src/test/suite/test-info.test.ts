@@ -377,6 +377,17 @@ suite('TestInfo', () => {
 
     test('error result', async () => {
       const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
+      const childItem = testController.createTestItem('child', 'child')
+      const childInfo = new TestCaseInfo(
+        childItem,
+        sampleTarget,
+        TestItemType.TestCase
+      )
+      currentRun.pendingChildrenIterator.returns(
+        (function* () {
+          yield childInfo
+        })()
+      )
       const bspResult: TestResult = {
         statusCode: StatusCode.Error,
         originId: 'sample',
@@ -395,6 +406,11 @@ suite('TestInfo', () => {
       assert.equal(
         currentRun.updateStatus.getCall(0).args[2]?.message,
         'hello\nworld'
+      )
+      assert.equal(currentRun.updateStatus.getCall(1).args[0], childItem)
+      assert.equal(
+        currentRun.updateStatus.getCall(1).args[1],
+        TestCaseStatus.Skipped
       )
     })
 

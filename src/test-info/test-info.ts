@@ -164,8 +164,9 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
       TestItemType.BazelTarget
     )) {
       if (result.statusCode === StatusCode.Error) {
-        // On error, mark children that didn't receive individual results as failed.
-        currentRun.updateStatus(child.testItem, TestCaseStatus.Failed)
+        // A target-level failure does not prove every discovered child test failed.
+        // Mark unknown children skipped so VS Code does not visually inherit the parent failure.
+        currentRun.updateStatus(child.testItem, TestCaseStatus.Skipped)
       } else {
         // On success, let Test Explorer determine status based on children's outcomes.
         currentRun.updateStatus(child.testItem, TestCaseStatus.Inherit)
