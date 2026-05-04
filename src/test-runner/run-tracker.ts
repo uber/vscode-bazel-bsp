@@ -130,8 +130,13 @@ export class TestRunTracker implements TaskOriginHandlers {
       await callback(item.testItem, this.cancelToken)
 
       if (this.status.get(item.testItem) === initialStatus) {
-        // If an updated status has not been set by the callback, consider it skipped.
-        this.updateStatus(item.testItem, TestCaseStatus.Skipped)
+        // Container nodes that defer execution to their children should not
+        // override the aggregate child status in Test Explorer.
+        const fallbackStatus =
+          item.testItem.children.size > 0
+            ? TestCaseStatus.Inherit
+            : TestCaseStatus.Skipped
+        this.updateStatus(item.testItem, fallbackStatus)
       }
     }
 
