@@ -561,18 +561,15 @@ suite('TestInfo', () => {
         .stub(fs, 'readFileSync')
         .returns(
           [
-            '    ✕ should correctly set FileUploader endpoint for production (8 ms)',
-            '    ✓ should correctly set FileUploader endpoint for critical (1 ms)',
+            '    ✕ fails one child test (8 ms)',
+            '    ✓ passes a sibling child test (1 ms)',
           ].join('\n')
         )
 
-      const failed = createTypeScriptTestCase(
-        'failed',
-        'should correctly set FileUploader endpoint for production'
-      )
+      const failed = createTypeScriptTestCase('failed', 'fails one child test')
       const passed = createTypeScriptTestCase(
         'passed',
-        'should correctly set FileUploader endpoint for critical'
+        'passes a sibling child test'
       )
       currentRun.pendingChildrenIterator.returns(
         (function* () {
@@ -590,7 +587,7 @@ suite('TestInfo', () => {
         originId: 'sample',
         data: {
           stdoutCollector: {
-            lines: ['FAIL: //sample:test (see /private/tmp/sample/test.log)'],
+            lines: ['FAIL: //sample:test (see /tmp/sample/test.log)'],
           },
         },
       }
@@ -643,7 +640,7 @@ suite('TestInfo', () => {
         originId: 'sample',
         data: {
           stdoutCollector: {
-            lines: ['FAIL: //sample:test (see /private/tmp/sample/test.log)'],
+            lines: ['FAIL: //sample:test (see /tmp/sample/test.log)'],
           },
         },
       }
