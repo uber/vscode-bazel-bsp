@@ -360,7 +360,7 @@ describe('Outer Suite', () => {
     test('returns false for fixture source paths', async () => {
       assert.strictEqual(
         languageTools.isValidTestSource(
-          'file:///workspace/src/fixtures/banner-step-fixture.ts'
+          'file:///workspace/src/fixtures/sample-helper-fixture.ts'
         ),
         false
       )
