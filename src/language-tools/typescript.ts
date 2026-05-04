@@ -18,7 +18,8 @@ export class TypeScriptLanguageTools
   isValidTestSource(uri: string): boolean {
     if (uri.includes('node_modules')) return false
     if (uri.includes('bazel-out')) return false
-    return true
+    // Only expose actual Jest test files, not fixtures/helpers under test dirs.
+    return TEST_FILE_REGEX.test(path.basename(uri))
   }
 
   getDebugRemoteRoot(
