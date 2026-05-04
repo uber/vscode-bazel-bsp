@@ -356,6 +356,15 @@ describe('Outer Suite', () => {
         true
       )
     })
+
+    test('returns false for fixture source paths', async () => {
+      assert.strictEqual(
+        languageTools.isValidTestSource(
+          'file:///workspace/src/fixtures/banner-step-fixture.ts'
+        ),
+        false
+      )
+    })
   })
 
   suite('inferSourcesFromTarget', () => {
