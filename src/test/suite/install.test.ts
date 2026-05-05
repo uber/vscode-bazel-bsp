@@ -164,12 +164,30 @@ load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_loc
       assert.ok(spawnCall.args[0].includes(coursierPath))
       assert.ok(spawnCall.args[0].includes(`--jvm ${config.javaVersion}`))
       assert.ok(spawnCall.args[0].includes('org.virtuslab:bazel-bsp:2.0.0'))
+      assert.ok(spawnCall.args[0].includes('--directories "."'))
+      assert.ok(spawnCall.args[0].includes('--derive-targets-from-directories'))
+      assert.ok(!spawnCall.args[0].includes('--targets'))
       assert.deepStrictEqual(spawnCall.args[1], {
         cwd: '/repo/root',
         shell: true,
       })
       assert.ok(installResult)
     })
+  })
+
+  test('uses workspace folder as generated project directory', async () => {
+    setupInstallTest(testConfigs.macArm64)
+    sandbox
+      .stub(Utils, 'getWorkspaceRoot')
+      .returns(vscode.Uri.file('/repo/root/packages/service'))
+
+    await bazelBSPInstaller.install()
+
+    assert.equal(spawnStub.callCount, 1)
+    const commandString = spawnStub.getCalls()[0].args[0]
+    assert.ok(commandString.includes('--directories "packages/service"'))
+    assert.ok(commandString.includes('--derive-targets-from-directories'))
+    assert.ok(!commandString.includes('--targets'))
   })
 
   test('failed coursier download', async () => {

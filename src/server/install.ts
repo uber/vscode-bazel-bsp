@@ -32,6 +32,7 @@ export interface InstallConfig {
   bazelProjectFilePath: string
   serverVersion: string
   bazelBinaryPath: string
+  projectViewDirectory: string
 }
 
 export class BazelBSPInstaller {
@@ -86,7 +87,7 @@ export class BazelBSPInstaller {
       return false
     }
 
-    const installConfig = await this.getInstallConfig()
+    const installConfig = await this.getInstallConfig(root)
     if (!installConfig) {
       this.outputChannel.appendLine(
         'Installation interrupted: failed to get settings.'
@@ -180,16 +181,15 @@ export class BazelBSPInstaller {
 
     // Flags to be passed to the installer.
     // See CliOptionsProvider in the server code for available options.
-    const installFlags: Map<string, string> = new Map([
+    const installFlags = [
       // Set Bazel project details to be used if a project file is not already present.
-      ['--project-view-file', config.bazelProjectFilePath],
-      ['--bazel-binary', bazelPath],
-      ['--targets', '//your/targets/here/...'],
-    ])
+      `--project-view-file "${config.bazelProjectFilePath}"`,
+      `--bazel-binary "${bazelPath}"`,
+      `--directories "${config.projectViewDirectory}"`,
+      '--derive-targets-from-directories',
+    ]
 
-    const flagsString = Array.from(installFlags.entries())
-      .map(([key, value]) => `${key} "${value}"`)
-      .join(' ')
+    const flagsString = installFlags.join(' ')
     const additionalInstallFlags = getExtensionSetting(
       SettingName.ADDITIONAL_INSTALL_FLAGS
     )
@@ -226,7 +226,7 @@ export class BazelBSPInstaller {
     })
   }
 
-  private async getInstallConfig(): Promise<InstallConfig | null> {
+  private async getInstallConfig(root: string): Promise<InstallConfig | null> {
     const settingError = (setting: SettingName) => {
       this.outputChannel.appendLine(
         `Install interrupted. Please check the ${setting} setting to ensure a valid value.`
@@ -268,7 +268,26 @@ export class BazelBSPInstaller {
       bazelProjectFilePath: projectFilePath,
       serverVersion: bazelBspVersion,
       bazelBinaryPath: bazelBinaryPath,
+      projectViewDirectory: this.getProjectViewDirectory(root),
     }
+  }
+
+  private getProjectViewDirectory(root: string): string {
+    const workspaceRoot = Utils.getWorkspaceRoot()
+    if (!workspaceRoot) {
+      return '.'
+    }
+
+    const relativePath = path.relative(root, workspaceRoot.fsPath)
+    if (
+      relativePath === '' ||
+      relativePath.startsWith('..') ||
+      path.isAbsolute(relativePath)
+    ) {
+      return '.'
+    }
+
+    return relativePath.split(path.sep).join('/')
   }
 
   /**

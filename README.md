@@ -28,8 +28,10 @@ The extension is still under active development, but initial development release
 3. View the "Testing" panel, which will show progress of the load, and show available test targets once the load is complete.
 
 ### Adjusting project scope
+By default, the generated project view is scoped to the workspace folder opened in VS Code. To change that scope:
+
 1. Click on the top level test case to open the .bazelproject that is in use.
-2. Adjust the "targets" entry to include desired targets.
+2. Adjust the `directories` or `targets` entries to include the desired scope.
 3. Click the refresh (circular arrow) icon at the top of the "testing" panel to re-sync available targets.
 
 ### Syncing changes to targets

@@ -35,13 +35,14 @@ As you interact with the VS Code UI, the client sends requests to this server ov
 1. Launch a workspace that contains .py or .java files, which will trigger extension activation.
 2. Accept the prompt to install the build server in the repo	
 3. Go to the "Testing" ![image](https://github.com/uber/vscode-bazel-bsp/assets/92764374/536205bd-6908-4184-9620-292aa2dfe7f6) panel in VS Code
-4. Adjust the project scope.  See "Adjusting Project Scope" section below.
-5. Let the sync process complete.  See "Sync Process" section below.
+4. Let the sync process complete. See "Sync Process" section below.
 
 ### Adjusting Project Scope
+The generated project view is scoped to the workspace folder opened in VS Code by default. To change that scope:
+
 1. Open Project View file: click on the file icon next to the "Bazel Test Targets" root test item
    ![image](https://github.com/uber/vscode-bazel-bsp/assets/92764374/795baab9-ec42-4b7d-9b1a-2e4033731b64)
-2. Adjust Targets: In the .bazelproject file that launches, specify one or more target patterns to be included in the sync scope
+2. Adjust Scope: In the .bazelproject file that launches, specify one or more directories or target patterns to be included in the sync scope
 3. Click the "Refresh Tests" Button:  Wait for the sync process to complete.
 
    ![image](https://github.com/uber/vscode-bazel-bsp/assets/92764374/bdbf80ad-485f-464b-b728-cdd86c42f0e5)
@@ -121,5 +122,4 @@ To run with coverage, use the "Run with Coverage" option appearing next to the r
   ![image](https://github.com/uber/vscode-bazel-bsp/assets/92764374/d9c376b8-74e8-4981-a400-ae2fb70ec2ae)
 
 - If a test is located under a different root node, or none, it may be coming a different extension.
-
 
