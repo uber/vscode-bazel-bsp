@@ -164,8 +164,10 @@ load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_loc
       assert.ok(spawnCall.args[0].includes(coursierPath))
       assert.ok(spawnCall.args[0].includes(`--jvm ${config.javaVersion}`))
       assert.ok(spawnCall.args[0].includes('org.virtuslab:bazel-bsp:2.0.0'))
-      assert.ok(spawnCall.args[0].includes('--directories "."'))
-      assert.ok(spawnCall.args[0].includes('--derive-targets-from-directories'))
+      assert.ok(!spawnCall.args[0].includes('--directories'))
+      assert.ok(
+        !spawnCall.args[0].includes('--derive-targets-from-directories')
+      )
       assert.ok(!spawnCall.args[0].includes('--targets'))
       assert.deepStrictEqual(spawnCall.args[1], {
         cwd: '/repo/root',
@@ -187,6 +189,36 @@ load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_loc
     const commandString = spawnStub.getCalls()[0].args[0]
     assert.ok(commandString.includes('--directories "packages/service"'))
     assert.ok(commandString.includes('--derive-targets-from-directories'))
+    assert.ok(!commandString.includes('--targets'))
+  })
+
+  test('does not derive targets from repo root workspace', async () => {
+    setupInstallTest(testConfigs.macArm64)
+    sandbox
+      .stub(Utils, 'getWorkspaceRoot')
+      .returns(vscode.Uri.file('/repo/root'))
+
+    await bazelBSPInstaller.install()
+
+    assert.equal(spawnStub.callCount, 1)
+    const commandString = spawnStub.getCalls()[0].args[0]
+    assert.ok(!commandString.includes('--directories "."'))
+    assert.ok(!commandString.includes('--derive-targets-from-directories'))
+    assert.ok(!commandString.includes('--targets'))
+  })
+
+  test('does not derive targets from top-level workspace directory', async () => {
+    setupInstallTest(testConfigs.macArm64)
+    sandbox
+      .stub(Utils, 'getWorkspaceRoot')
+      .returns(vscode.Uri.file('/repo/root/src'))
+
+    await bazelBSPInstaller.install()
+
+    assert.equal(spawnStub.callCount, 1)
+    const commandString = spawnStub.getCalls()[0].args[0]
+    assert.ok(!commandString.includes('--directories "src"'))
+    assert.ok(!commandString.includes('--derive-targets-from-directories'))
     assert.ok(!commandString.includes('--targets'))
   })
 

@@ -38,7 +38,7 @@ As you interact with the VS Code UI, the client sends requests to this server ov
 4. Let the sync process complete. See "Sync Process" section below.
 
 ### Adjusting Project Scope
-The generated project view is scoped to the workspace folder opened in VS Code by default. To change that scope:
+When VS Code is opened to a nested workspace folder, the generated project view is scoped to that folder. If VS Code is opened at the repository root or another broad scope, adjust the project view before syncing:
 
 1. Open Project View file: click on the file icon next to the "Bazel Test Targets" root test item
    ![image](https://github.com/uber/vscode-bazel-bsp/assets/92764374/795baab9-ec42-4b7d-9b1a-2e4033731b64)
@@ -122,4 +122,3 @@ To run with coverage, use the "Run with Coverage" option appearing next to the r
   ![image](https://github.com/uber/vscode-bazel-bsp/assets/92764374/d9c376b8-74e8-4981-a400-ae2fb70ec2ae)
 
 - If a test is located under a different root node, or none, it may be coming a different extension.
-

@@ -32,7 +32,7 @@ export interface InstallConfig {
   bazelProjectFilePath: string
   serverVersion: string
   bazelBinaryPath: string
-  projectViewDirectory: string
+  projectViewDirectory?: string
 }
 
 export class BazelBSPInstaller {
@@ -185,9 +185,13 @@ export class BazelBSPInstaller {
       // Set Bazel project details to be used if a project file is not already present.
       `--project-view-file "${config.bazelProjectFilePath}"`,
       `--bazel-binary "${bazelPath}"`,
-      `--directories "${config.projectViewDirectory}"`,
-      '--derive-targets-from-directories',
     ]
+    if (config.projectViewDirectory) {
+      installFlags.push(
+        `--directories "${config.projectViewDirectory}"`,
+        '--derive-targets-from-directories'
+      )
+    }
 
     const flagsString = installFlags.join(' ')
     const additionalInstallFlags = getExtensionSetting(
@@ -272,10 +276,10 @@ export class BazelBSPInstaller {
     }
   }
 
-  private getProjectViewDirectory(root: string): string {
+  private getProjectViewDirectory(root: string): string | undefined {
     const workspaceRoot = Utils.getWorkspaceRoot()
     if (!workspaceRoot) {
-      return '.'
+      return undefined
     }
 
     const relativePath = path.relative(root, workspaceRoot.fsPath)
@@ -284,10 +288,15 @@ export class BazelBSPInstaller {
       relativePath.startsWith('..') ||
       path.isAbsolute(relativePath)
     ) {
-      return '.'
+      return undefined
     }
 
-    return relativePath.split(path.sep).join('/')
+    const pathSegments = relativePath.split(path.sep).filter(Boolean)
+    if (pathSegments.length < 2) {
+      return undefined
+    }
+
+    return pathSegments.join('/')
   }
 
   /**
