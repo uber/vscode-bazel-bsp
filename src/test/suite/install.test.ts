@@ -168,7 +168,9 @@ load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_loc
       assert.ok(
         !spawnCall.args[0].includes('--derive-targets-from-directories')
       )
-      assert.ok(!spawnCall.args[0].includes('--targets'))
+      assert.ok(
+        spawnCall.args[0].includes('--targets "//your/targets/here/..."')
+      )
       assert.deepStrictEqual(spawnCall.args[1], {
         cwd: '/repo/root',
         shell: true,
@@ -204,7 +206,7 @@ load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_loc
     const commandString = spawnStub.getCalls()[0].args[0]
     assert.ok(!commandString.includes('--directories "."'))
     assert.ok(!commandString.includes('--derive-targets-from-directories'))
-    assert.ok(!commandString.includes('--targets'))
+    assert.ok(commandString.includes('--targets "//your/targets/here/..."'))
   })
 
   test('does not derive targets from top-level workspace directory', async () => {
@@ -219,7 +221,7 @@ load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_loc
     const commandString = spawnStub.getCalls()[0].args[0]
     assert.ok(!commandString.includes('--directories "src"'))
     assert.ok(!commandString.includes('--derive-targets-from-directories'))
-    assert.ok(!commandString.includes('--targets'))
+    assert.ok(commandString.includes('--targets "//your/targets/here/..."'))
   })
 
   test('failed coursier download', async () => {

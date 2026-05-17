@@ -32,7 +32,7 @@ export interface InstallConfig {
   bazelProjectFilePath: string
   serverVersion: string
   bazelBinaryPath: string
-  projectViewDirectory?: string
+  projectViewScopeDirectory?: string
 }
 
 export class BazelBSPInstaller {
@@ -181,19 +181,25 @@ export class BazelBSPInstaller {
 
     // Flags to be passed to the installer.
     // See CliOptionsProvider in the server code for available options.
-    const installFlags = [
+    const installFlags: Map<string, string> = new Map([
       // Set Bazel project details to be used if a project file is not already present.
-      `--project-view-file "${config.bazelProjectFilePath}"`,
-      `--bazel-binary "${bazelPath}"`,
-    ]
-    if (config.projectViewDirectory) {
-      installFlags.push(
-        `--directories "${config.projectViewDirectory}"`,
-        '--derive-targets-from-directories'
-      )
+      ['--project-view-file', config.bazelProjectFilePath],
+      ['--bazel-binary', bazelPath],
+    ])
+    const installFlagSwitches: string[] = []
+    if (config.projectViewScopeDirectory) {
+      installFlags.set('--directories', config.projectViewScopeDirectory)
+      installFlagSwitches.push('--derive-targets-from-directories')
+    } else {
+      installFlags.set('--targets', '//your/targets/here/...')
     }
 
-    const flagsString = installFlags.join(' ')
+    const flagsString = [
+      ...Array.from(installFlags.entries()).map(
+        ([key, value]) => `${key} "${value}"`
+      ),
+      ...installFlagSwitches,
+    ].join(' ')
     const additionalInstallFlags = getExtensionSetting(
       SettingName.ADDITIONAL_INSTALL_FLAGS
     )
@@ -272,11 +278,11 @@ export class BazelBSPInstaller {
       bazelProjectFilePath: projectFilePath,
       serverVersion: bazelBspVersion,
       bazelBinaryPath: bazelBinaryPath,
-      projectViewDirectory: this.getProjectViewDirectory(root),
+      projectViewScopeDirectory: this.getProjectViewScopeDirectory(root),
     }
   }
 
-  private getProjectViewDirectory(root: string): string | undefined {
+  private getProjectViewScopeDirectory(root: string): string | undefined {
     const workspaceRoot = Utils.getWorkspaceRoot()
     if (!workspaceRoot) {
       return undefined
