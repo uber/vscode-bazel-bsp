@@ -8,6 +8,7 @@ export enum SettingName {
   BSP_SERVER_VERSION = 'serverVersion',
   BAZEL_BINARY_PATH = 'bazelBinaryPath',
   SERVER_INSTALL_MODE = 'serverInstallMode',
+  PROJECT_VIEW_SCOPE_DIRECTORY_MIN_DEPTH = 'projectViewScopeDirectoryMinDepth',
   AUTO_EXPAND_TARGET = 'autoExpandTarget',
   DEBUG_ENABLED = 'debug.enabled',
   DEBUG_BAZEL_FLAGS = 'debug.bazelFlags',
@@ -23,6 +24,7 @@ export interface SettingTypes {
   [SettingName.BSP_SERVER_VERSION]: string
   [SettingName.BAZEL_BINARY_PATH]: string
   [SettingName.SERVER_INSTALL_MODE]: string
+  [SettingName.PROJECT_VIEW_SCOPE_DIRECTORY_MIN_DEPTH]: number | null
   [SettingName.AUTO_EXPAND_TARGET]: boolean
   [SettingName.DEBUG_ENABLED]: boolean
   [SettingName.DEBUG_BAZEL_FLAGS]: string[]

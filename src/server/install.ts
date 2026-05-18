@@ -278,11 +278,21 @@ export class BazelBSPInstaller {
       bazelProjectFilePath: projectFilePath,
       serverVersion: bazelBspVersion,
       bazelBinaryPath: bazelBinaryPath,
-      projectViewScopeDirectory: this.getProjectViewScopeDirectory(root),
+      projectViewScopeDirectory: this.getProjectViewScopeDirectory(
+        root,
+        getExtensionSetting(SettingName.PROJECT_VIEW_SCOPE_DIRECTORY_MIN_DEPTH)
+      ),
     }
   }
 
-  private getProjectViewScopeDirectory(root: string): string | undefined {
+  private getProjectViewScopeDirectory(
+    root: string,
+    minDepth: number | null | undefined
+  ): string | undefined {
+    if (minDepth === undefined || minDepth === null || minDepth < 1) {
+      return undefined
+    }
+
     const workspaceRoot = Utils.getWorkspaceRoot()
     if (!workspaceRoot) {
       return undefined
@@ -298,7 +308,7 @@ export class BazelBSPInstaller {
     }
 
     const pathSegments = relativePath.split(path.sep).filter(Boolean)
-    if (pathSegments.length < 2) {
+    if (pathSegments.length < minDepth) {
       return undefined
     }
 

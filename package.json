@@ -80,6 +80,15 @@
           ],
           "description": "Installation behavior for the build server."
         },
+        "bazelbsp.projectViewScopeDirectoryMinDepth": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null,
+          "minimum": 1,
+          "description": "Minimum number of workspace path segments under the repository root required to generate a project view scope from the opened workspace folder. Leave unset to use the manual placeholder target."
+        },
         "bazelbsp.autoExpandTarget": {
           "type": "boolean",
           "default": true,
