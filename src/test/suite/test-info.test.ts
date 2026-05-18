@@ -602,6 +602,62 @@ suite('TestInfo', () => {
       assert.ok(currentRun.updateStatus.neverCalledWith(childItem))
     })
 
+    test('error result, test suite inherits child statuses instead of aggregate target failure', async () => {
+      const childItem = testController.createTestItem('child', 'child')
+      testItem.children.add(childItem)
+      const childInfo = new TestItemTestCaseInfo(
+        childItem,
+        sampleTypeScriptTarget,
+        {
+          uri: vscode.Uri.file(
+            '/sample/src/example/__tests__/sample.browser.ts'
+          ),
+          name: 'child',
+          parent: undefined,
+          range: new vscode.Range(0, 0, 0, 0),
+          testFilter: 'child',
+        },
+        new TypeScriptLanguageTools()
+      )
+      currentRun.pendingChildrenIterator.returns(
+        (function* () {
+          yield childInfo
+        })()
+      )
+
+      const testInfo = new TestItemTestCaseInfo(
+        testItem,
+        sampleTypeScriptTarget,
+        {
+          uri: vscode.Uri.file(
+            '/sample/src/example/__tests__/sample.browser.ts'
+          ),
+          name: 'suite',
+          parent: undefined,
+          range: new vscode.Range(0, 0, 0, 0),
+          testFilter: 'suite',
+        },
+        new TypeScriptLanguageTools()
+      )
+      const bspResult: TestResult = {
+        statusCode: StatusCode.Error,
+        originId: 'sample',
+        data: {
+          stdoutCollector: {lines: ['FAIL: //sample:test']},
+        },
+      }
+
+      testInfo.processTestRunResult(currentRun, bspResult)
+
+      assert.ok(
+        currentRun.updateStatus.calledOnceWithExactly(
+          testItem,
+          TestCaseStatus.Inherit
+        )
+      )
+      assert.ok(currentRun.updateStatus.neverCalledWith(childItem))
+    })
+
     test('error result', async () => {
       const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
       const bspResult: TestResult = {

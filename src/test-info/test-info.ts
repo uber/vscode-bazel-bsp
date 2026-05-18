@@ -339,6 +339,28 @@ export class TestItemTestCaseInfo extends SourceFileTestCaseInfo {
     this.details = details
   }
 
+  processTestRunResult(currentRun: TestRunTracker, result: TestResult): void {
+    if (
+      result.statusCode === StatusCode.Error &&
+      this.testItem.children.size > 0
+    ) {
+      currentRun.updateStatus(this.testItem, TestCaseStatus.Inherit)
+
+      for (const child of currentRun.pendingChildrenIterator(
+        this.testItem,
+        TestItemType.SourceFile
+      )) {
+        if (child.testItem.children.size > 0) {
+          currentRun.updateStatus(child.testItem, TestCaseStatus.Inherit)
+        }
+      }
+
+      return
+    }
+
+    super.processTestRunResult(currentRun, result)
+  }
+
   /**
    * Sets a test case's label to its name.
    * @param relativeToItem will be ignored in this implementation
