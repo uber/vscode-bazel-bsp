@@ -1,6 +1,5 @@
 import * as vscode from 'vscode'
 import * as assert from 'assert'
-import * as fs from 'fs'
 import sinon from 'sinon'
 import {
   BuildTargetTestCaseInfo,
@@ -17,6 +16,7 @@ import {beforeEach, afterEach} from 'mocha'
 import {TestParamsDataKind} from '../../bsp/bsp-ext'
 import {DocumentTestItem} from '../../language-tools/manager'
 import {Utils} from '../../utils/utils'
+import {TypeScriptLanguageTools} from '../../language-tools/typescript'
 
 suite('TestInfo', () => {
   const sampleTarget: BuildTarget = {
@@ -118,7 +118,8 @@ suite('TestInfo', () => {
       const testInfo = new SourceDirTestCaseInfo(
         testItem,
         sampleTypeScriptTarget,
-        '/sample/dir'
+        '/sample/dir',
+        new TypeScriptLanguageTools()
       )
       const currentRun = sandbox.createStubInstance(TestRunTracker)
       const result = testInfo.prepareTestRunParams(currentRun)
@@ -177,7 +178,8 @@ suite('TestInfo', () => {
 
       const testInfo = new SourceFileTestCaseInfo(
         testItem,
-        sampleTypeScriptTarget
+        sampleTypeScriptTarget,
+        new TypeScriptLanguageTools()
       )
       testInfo.setDocumentTestItem(sampleDetails)
 
@@ -207,7 +209,8 @@ suite('TestInfo', () => {
       )
       const testInfo = new SourceFileTestCaseInfo(
         testItem,
-        sampleTypeScriptTarget
+        sampleTypeScriptTarget,
+        new TypeScriptLanguageTools()
       )
 
       const currentRun = sandbox.createStubInstance(TestRunTracker)
@@ -275,7 +278,8 @@ suite('TestInfo', () => {
       const testInfo = new TestItemTestCaseInfo(
         testItem,
         sampleTypeScriptTarget,
-        sampleDetails
+        sampleDetails,
+        new TypeScriptLanguageTools()
       )
       const currentRun = sandbox.createStubInstance(TestRunTracker)
       sandbox.stub(currentRun, 'originName').get(() => 'sample')
@@ -465,23 +469,6 @@ suite('TestInfo', () => {
       sandbox.stub(currentRun, 'originName').get(() => 'sample')
     })
 
-    function createTypeScriptTestCase(
-      id: string,
-      label: string,
-      lookupKey?: string
-    ) {
-      const item = testController.createTestItem(id, label)
-      const info = new TestItemTestCaseInfo(item, sampleTypeScriptTarget, {
-        uri: vscode.Uri.file('/sample/src/example/__tests__/sample.browser.ts'),
-        name: label,
-        parent: undefined,
-        range: new vscode.Range(0, 0, 0, 0),
-        testFilter: label,
-        lookupKey,
-      })
-      return {item, info}
-    }
-
     test('ok result, build target', async () => {
       const testInfo = new BuildTargetTestCaseInfo(testItem, sampleTarget)
       const bspResult: TestResult = {
@@ -556,25 +543,42 @@ suite('TestInfo', () => {
       )
     })
 
-    test('error result, source file preserves mixed child statuses from jest output', async () => {
-      sandbox
-        .stub(fs, 'readFileSync')
-        .returns(
-          [
-            '    ✕ fails one child test (8 ms)',
-            '    ✓ passes a sibling child test (1 ms)',
-          ].join('\n')
-        )
-
-      const failed = createTypeScriptTestCase('failed', 'fails one child test')
-      const passed = createTypeScriptTestCase(
-        'passed',
-        'passes a sibling child test'
+    test('error result, source file clears containers and leaves leaf tests for server-reported statuses', async () => {
+      const suiteItem = testController.createTestItem('suite', 'suite')
+      const childItem = testController.createTestItem('child', 'child')
+      suiteItem.children.add(childItem)
+      const suiteInfo = new TestItemTestCaseInfo(
+        suiteItem,
+        sampleTypeScriptTarget,
+        {
+          uri: vscode.Uri.file(
+            '/sample/src/example/__tests__/sample.browser.ts'
+          ),
+          name: 'suite',
+          parent: undefined,
+          range: new vscode.Range(0, 0, 0, 0),
+          testFilter: 'suite',
+        },
+        new TypeScriptLanguageTools()
+      )
+      const childInfo = new TestItemTestCaseInfo(
+        childItem,
+        sampleTypeScriptTarget,
+        {
+          uri: vscode.Uri.file(
+            '/sample/src/example/__tests__/sample.browser.ts'
+          ),
+          name: 'child',
+          parent: undefined,
+          range: new vscode.Range(0, 0, 0, 0),
+          testFilter: 'child',
+        },
+        new TypeScriptLanguageTools()
       )
       currentRun.pendingChildrenIterator.returns(
         (function* () {
-          yield failed.info
-          yield passed.info
+          yield suiteInfo
+          yield childInfo
         })()
       )
 
@@ -586,73 +590,16 @@ suite('TestInfo', () => {
         statusCode: StatusCode.Error,
         originId: 'sample',
         data: {
-          stdoutCollector: {
-            lines: ['FAIL: //sample:test (see /tmp/sample/test.log)'],
-          },
+          stdoutCollector: {lines: ['FAIL: //sample:test']},
         },
       }
 
       testInfo.processTestRunResult(currentRun, bspResult)
 
       assert.ok(
-        currentRun.updateStatus.calledWith(failed.item, TestCaseStatus.Failed)
+        currentRun.updateStatus.calledWith(suiteItem, TestCaseStatus.Inherit)
       )
-      assert.ok(
-        currentRun.updateStatus.calledWith(passed.item, TestCaseStatus.Passed)
-      )
-    })
-
-    test('error result, source file uses lookup keys for duplicate jest labels', async () => {
-      sandbox
-        .stub(fs, 'readFileSync')
-        .returns(
-          [
-            '  loading state',
-            '    ✕ renders (8 ms)',
-            '  success state',
-            '    ✓ renders (1 ms)',
-          ].join('\n')
-        )
-
-      const failed = createTypeScriptTestCase(
-        'failed',
-        'renders',
-        'loading state renders'
-      )
-      const passed = createTypeScriptTestCase(
-        'passed',
-        'renders',
-        'success state renders'
-      )
-      currentRun.pendingChildrenIterator.returns(
-        (function* () {
-          yield failed.info
-          yield passed.info
-        })()
-      )
-
-      const testInfo = new SourceFileTestCaseInfo(
-        testItem,
-        sampleTypeScriptTarget
-      )
-      const bspResult: TestResult = {
-        statusCode: StatusCode.Error,
-        originId: 'sample',
-        data: {
-          stdoutCollector: {
-            lines: ['FAIL: //sample:test (see /tmp/sample/test.log)'],
-          },
-        },
-      }
-
-      testInfo.processTestRunResult(currentRun, bspResult)
-
-      assert.ok(
-        currentRun.updateStatus.calledWith(failed.item, TestCaseStatus.Failed)
-      )
-      assert.ok(
-        currentRun.updateStatus.calledWith(passed.item, TestCaseStatus.Passed)
-      )
+      assert.ok(currentRun.updateStatus.neverCalledWith(childItem))
     })
 
     test('error result', async () => {

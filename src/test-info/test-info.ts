@@ -1,11 +1,9 @@
 import * as vscode from 'vscode'
 import * as path from 'path'
-import * as fs from 'fs'
 import {BuildTarget, TestParams, TestResult, StatusCode} from '../bsp/bsp'
 import {TestParamsDataKind, BazelTestParamsData} from '../bsp/bsp-ext'
 import {TestCaseStatus, TestRunTracker} from '../test-runner/run-tracker'
-import {DocumentTestItem} from '../language-tools/manager'
-import {Utils} from '../utils/utils'
+import type {DocumentTestItem, LanguageTools} from '../language-tools/manager'
 
 export enum TestItemType {
   Root,
@@ -100,12 +98,18 @@ export class TargetDirTestCaseInfo extends TestCaseInfo {
 export class BuildTargetTestCaseInfo extends TestCaseInfo {
   public readonly type: TestItemType
   public readonly target: BuildTarget
+  protected readonly languageTools: LanguageTools | undefined
 
-  constructor(test: vscode.TestItem, target: BuildTarget) {
+  constructor(
+    test: vscode.TestItem,
+    target: BuildTarget,
+    languageTools?: LanguageTools
+  ) {
     super(test, target)
     this.type = TestItemType.BazelTarget
     // This class and any that extend it are guaranteed to include a target.
     this.target = target
+    this.languageTools = languageTools
   }
 
   prepareTestRunParams(currentRun: TestRunTracker): TestParams | undefined {
@@ -195,14 +199,19 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
 export class SourceDirTestCaseInfo extends BuildTargetTestCaseInfo {
   public readonly type: TestItemType
   private readonly dir: string
-  constructor(test: vscode.TestItem, target: BuildTarget, dir: string) {
-    super(test, target)
+  constructor(
+    test: vscode.TestItem,
+    target: BuildTarget,
+    dir: string,
+    languageTools?: LanguageTools
+  ) {
+    super(test, target, languageTools)
     this.dir = dir
     this.type = TestItemType.SourceDirectory
   }
 
   prepareTestRunParams(currentRun: TestRunTracker): TestParams | undefined {
-    if (isTypeScriptTarget(this.target)) {
+    if (this.languageTools?.shouldDeferSourceDirectoryRun()) {
       return
     }
 
@@ -233,8 +242,12 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
   public readonly type: TestItemType
   protected details: DocumentTestItem | undefined
 
-  constructor(test: vscode.TestItem, target: BuildTarget) {
-    super(test, target)
+  constructor(
+    test: vscode.TestItem,
+    target: BuildTarget,
+    languageTools?: LanguageTools
+  ) {
+    super(test, target, languageTools)
     this.type = TestItemType.SourceFile
   }
 
@@ -263,20 +276,13 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
   processTestRunResult(currentRun: TestRunTracker, result: TestResult): void {
     updateStatus(this.testItem, currentRun, result)
 
-    const children = Array.from(
-      currentRun.pendingChildrenIterator(this.testItem, TestItemType.SourceFile)
-    )
-    const childStatuses = parseJestChildStatuses(result, children)
-
-    for (const child of children) {
-      const status = childStatuses.get(getStatusKey(child))
-      if (status) {
-        currentRun.updateStatus(child.testItem, status)
-      } else if (result.statusCode === StatusCode.Ok) {
+    for (const child of currentRun.pendingChildrenIterator(
+      this.testItem,
+      TestItemType.SourceFile
+    )) {
+      if (result.statusCode === StatusCode.Ok) {
         currentRun.updateStatus(child.testItem, TestCaseStatus.Passed)
-      } else if (childStatuses.size === 0) {
-        currentRun.updateStatus(child.testItem, TestCaseStatus.Failed)
-      } else {
+      } else if (child.testItem.children.size > 0) {
         currentRun.updateStatus(child.testItem, TestCaseStatus.Inherit)
       }
     }
@@ -284,16 +290,7 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
 
   private getTestFileArgument(): string | undefined {
     const uri = this.details?.uri ?? this.testItem.uri
-    if (!uri || !isTypeScriptTarget(this.target)) {
-      return undefined
-    }
-
-    const workspaceRoot = Utils.getWorkspaceRoot()
-    if (!workspaceRoot) {
-      return undefined
-    }
-
-    return path.relative(workspaceRoot.fsPath, uri.fsPath)
+    return this.languageTools?.getTestFileArgument(uri)
   }
 
   /**
@@ -334,9 +331,10 @@ export class TestItemTestCaseInfo extends SourceFileTestCaseInfo {
   constructor(
     test: vscode.TestItem,
     target: BuildTarget,
-    details: DocumentTestItem
+    details: DocumentTestItem,
+    languageTools?: LanguageTools
   ) {
-    super(test, target)
+    super(test, target, languageTools)
     this.type = TestItemType.TestCase
     this.details = details
   }
@@ -365,107 +363,5 @@ function updateStatus(
     currentRun.updateStatus(item, TestCaseStatus.Passed)
   } else {
     currentRun.updateStatus(item, TestCaseStatus.Skipped)
-  }
-}
-
-function isTypeScriptTarget(target: BuildTarget): boolean {
-  return (
-    target.languageIds?.includes('typescript') ||
-    target.languageIds?.includes('typescriptreact')
-  )
-}
-
-function parseJestChildStatuses(
-  result: TestResult,
-  children: TestCaseInfo[]
-): Map<string, TestCaseStatus> {
-  const statuses = new Map<string, TestCaseStatus>()
-  const labelCounts = new Map<string, number>()
-  const suiteStack: {indent: number; name: string}[] = []
-
-  for (const child of children) {
-    labelCounts.set(
-      child.testItem.label,
-      (labelCounts.get(child.testItem.label) ?? 0) + 1
-    )
-  }
-
-  for (const line of getResultOutputLines(result)) {
-    const cleanLine = Utils.removeAnsiEscapeCodes(line).replace(/\r$/, '')
-    const statusMatch = cleanLine.match(
-      /^(\s*)([✓✔√✕✖×])\s+(.+?)(?:\s+\(\d+(?:\.\d+)?\s*(?:m?s|μs|ns)\))?$/
-    )
-
-    if (statusMatch) {
-      const statusIndent = statusMatch[1].length
-      const status = /^[✓✔√]$/.test(statusMatch[2])
-        ? TestCaseStatus.Passed
-        : TestCaseStatus.Failed
-      const testName = statusMatch[3].trim()
-      const activeSuites = suiteStack
-        .filter(suite => suite.indent < statusIndent)
-        .map(suite => suite.name)
-      const lookupKey = [...activeSuites, testName].join(' ')
-      const matchingChild =
-        children.find(child => getStatusKey(child) === lookupKey) ??
-        (labelCounts.get(testName) === 1
-          ? children.find(child => child.testItem.label === testName)
-          : undefined)
-
-      if (matchingChild) {
-        statuses.set(getStatusKey(matchingChild), status)
-      }
-      continue
-    }
-
-    const suiteMatch = cleanLine.match(
-      /^(\s{2,})(?!(?:Test Suites|Tests|Snapshots|Time|Ran all test suites|Force exiting Jest):)(\S.*)$/
-    )
-    if (suiteMatch) {
-      const suiteIndent = suiteMatch[1].length
-      while (
-        suiteStack.length > 0 &&
-        suiteIndent <= suiteStack[suiteStack.length - 1].indent
-      ) {
-        suiteStack.pop()
-      }
-      suiteStack.push({
-        indent: suiteIndent,
-        name: suiteMatch[2].trim(),
-      })
-    } else if (cleanLine.trim().length > 0 && !cleanLine.startsWith(' ')) {
-      suiteStack.length = 0
-    }
-  }
-
-  return statuses
-}
-
-function getStatusKey(child: TestCaseInfo): string {
-  if (child instanceof SourceFileTestCaseInfo) {
-    return child.getDocumentTestItem()?.lookupKey ?? child.testItem.label
-  }
-
-  return child.testItem.label
-}
-
-function getResultOutputLines(result: TestResult): string[] {
-  const stdout = result.data?.stdoutCollector?.lines ?? []
-  const stderr = result.data?.stderrCollector?.lines ?? []
-  const outputLines = [...stdout, ...stderr]
-  const testLogLines = outputLines.flatMap(readTestLogLines)
-  return [...outputLines, ...testLogLines]
-}
-
-function readTestLogLines(line: string): string[] {
-  const match = line.match(/\/\S+\/test\.log\b/)
-  if (!match) {
-    return []
-  }
-
-  try {
-    return fs.readFileSync(match[0], 'utf8').split('\n')
-  } catch {
-    return []
   }
 }

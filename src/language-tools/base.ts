@@ -2,7 +2,7 @@ import * as vscode from 'vscode'
 import {LanguageTools, TestFileContents} from './manager'
 import * as bsp from '../bsp/bsp'
 import {TestFinish} from '../bsp/bsp'
-import {TestCaseInfo} from '../test-info/test-info'
+import type {TestCaseInfo} from '../test-info/test-info'
 
 /**
  * Fallback implementation for languages that do not have their own specific logic built out.
@@ -23,6 +23,14 @@ export class BaseLanguageTools implements LanguageTools {
    * @returns undefined as there is no support for individual test case identification.
    */
   mapTestCaseInfoToLookupKey(testCaseInfo: TestCaseInfo): string | undefined {
+    return undefined
+  }
+
+  shouldDeferSourceDirectoryRun(): boolean {
+    return false
+  }
+
+  getTestFileArgument(uri: vscode.Uri | undefined): string | undefined {
     return undefined
   }
 
