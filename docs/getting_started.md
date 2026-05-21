@@ -35,13 +35,14 @@ As you interact with the VS Code UI, the client sends requests to this server ov
 1. Launch a workspace that contains .py or .java files, which will trigger extension activation.
 2. Accept the prompt to install the build server in the repo	
 3. Go to the "Testing" ![image](https://github.com/uber/vscode-bazel-bsp/assets/92764374/536205bd-6908-4184-9620-292aa2dfe7f6) panel in VS Code
-4. Adjust the project scope.  See "Adjusting Project Scope" section below.
-5. Let the sync process complete.  See "Sync Process" section below.
+4. Let the sync process complete. See "Sync Process" section below.
 
 ### Adjusting Project Scope
+By default, the generated project view includes a placeholder target pattern for manual editing. If `bazelbsp.projectViewScopeDirectoryMinDepth` is configured and VS Code is opened to a workspace folder deep enough under the repository root, the generated project view is scoped to that folder. Otherwise, adjust the project view before syncing:
+
 1. Open Project View file: click on the file icon next to the "Bazel Test Targets" root test item
    ![image](https://github.com/uber/vscode-bazel-bsp/assets/92764374/795baab9-ec42-4b7d-9b1a-2e4033731b64)
-2. Adjust Targets: In the .bazelproject file that launches, specify one or more target patterns to be included in the sync scope
+2. Adjust Scope: In the .bazelproject file that launches, specify one or more directories or target patterns to be included in the sync scope
 3. Click the "Refresh Tests" Button:  Wait for the sync process to complete.
 
    ![image](https://github.com/uber/vscode-bazel-bsp/assets/92764374/bdbf80ad-485f-464b-b728-cdd86c42f0e5)
@@ -103,6 +104,7 @@ To run with coverage, use the "Run with Coverage" option appearing next to the r
 ### Key Settings
 - `bazelBinaryPath`: If you have a specific Bazel binary to be used, set it here.  This will only be used when generating a new .bazelproject file to set the bazel_binary field.
 - `bazelProjectFilePath`: If you already have an existing project view file that you would prefer to use, point this setting to that location instead.  Be sure to reinstall the BSP server (Cmd+Shift+P → Install BSP Server) and reload the window to begin indexing based on the updated file.
+- `projectViewScopeDirectoryMinDepth`: If set, generated project views use the opened workspace folder as `directories` scope only when that folder is at least this many path segments under the repository root. Leave unset to generate the manual placeholder target instead.
 - `serverInstallMode`: Can be set to 'Auto' to install automatically in a new repo.
 - `serverVersion`: Determines which version of Bazel BSP will be installed.
 
@@ -121,5 +123,3 @@ To run with coverage, use the "Run with Coverage" option appearing next to the r
   ![image](https://github.com/uber/vscode-bazel-bsp/assets/92764374/d9c376b8-74e8-4981-a400-ae2fb70ec2ae)
 
 - If a test is located under a different root node, or none, it may be coming a different extension.
-
-

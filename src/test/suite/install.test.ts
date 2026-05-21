@@ -31,6 +31,7 @@ suite('BSP Installer', () => {
     isGzipped: boolean
     javaVersion: string
     additionalInstallFlags?: string[]
+    projectViewScopeDirectoryMinDepth?: number | null
   }
 
   const setupInstallTest = (config: InstallTestConfig) => {
@@ -54,6 +55,8 @@ suite('BSP Installer', () => {
       .returns('Prompt')
       .withArgs(settings.SettingName.ADDITIONAL_INSTALL_FLAGS)
       .returns(config.additionalInstallFlags || [])
+      .withArgs(settings.SettingName.PROJECT_VIEW_SCOPE_DIRECTORY_MIN_DEPTH)
+      .returns(config.projectViewScopeDirectoryMinDepth ?? null)
 
     sandbox.stub(fs, 'readFile').resolves(
       `#if( $pythonEnabled == "true" && $bazel8OrAbove == "true" )
@@ -164,12 +167,88 @@ load("//aspects:utils/utils.bzl", "create_struct", "file_location", "to_file_loc
       assert.ok(spawnCall.args[0].includes(coursierPath))
       assert.ok(spawnCall.args[0].includes(`--jvm ${config.javaVersion}`))
       assert.ok(spawnCall.args[0].includes('org.virtuslab:bazel-bsp:2.0.0'))
+      assert.ok(!spawnCall.args[0].includes('--directories'))
+      assert.ok(
+        !spawnCall.args[0].includes('--derive-targets-from-directories')
+      )
+      assert.ok(
+        spawnCall.args[0].includes('--targets "//your/targets/here/..."')
+      )
       assert.deepStrictEqual(spawnCall.args[1], {
         cwd: '/repo/root',
         shell: true,
       })
       assert.ok(installResult)
     })
+  })
+
+  test('uses workspace folder as generated project directory when min depth is configured', async () => {
+    setupInstallTest({
+      ...testConfigs.macArm64,
+      projectViewScopeDirectoryMinDepth: 2,
+    })
+    sandbox
+      .stub(Utils, 'getWorkspaceRoot')
+      .returns(vscode.Uri.file('/repo/root/packages/service'))
+
+    await bazelBSPInstaller.install()
+
+    assert.equal(spawnStub.callCount, 1)
+    const commandString = spawnStub.getCalls()[0].args[0]
+    assert.ok(commandString.includes('--directories "packages/service"'))
+    assert.ok(commandString.includes('--derive-targets-from-directories'))
+    assert.ok(!commandString.includes('--targets'))
+  })
+
+  test('does not derive targets when min depth is unset', async () => {
+    setupInstallTest(testConfigs.macArm64)
+    sandbox
+      .stub(Utils, 'getWorkspaceRoot')
+      .returns(vscode.Uri.file('/repo/root/packages/service'))
+
+    await bazelBSPInstaller.install()
+
+    assert.equal(spawnStub.callCount, 1)
+    const commandString = spawnStub.getCalls()[0].args[0]
+    assert.ok(!commandString.includes('--directories "packages/service"'))
+    assert.ok(!commandString.includes('--derive-targets-from-directories'))
+    assert.ok(commandString.includes('--targets "//your/targets/here/..."'))
+  })
+
+  test('does not derive targets from repo root workspace', async () => {
+    setupInstallTest({
+      ...testConfigs.macArm64,
+      projectViewScopeDirectoryMinDepth: 2,
+    })
+    sandbox
+      .stub(Utils, 'getWorkspaceRoot')
+      .returns(vscode.Uri.file('/repo/root'))
+
+    await bazelBSPInstaller.install()
+
+    assert.equal(spawnStub.callCount, 1)
+    const commandString = spawnStub.getCalls()[0].args[0]
+    assert.ok(!commandString.includes('--directories "."'))
+    assert.ok(!commandString.includes('--derive-targets-from-directories'))
+    assert.ok(commandString.includes('--targets "//your/targets/here/..."'))
+  })
+
+  test('does not derive targets from top-level workspace directory', async () => {
+    setupInstallTest({
+      ...testConfigs.macArm64,
+      projectViewScopeDirectoryMinDepth: 2,
+    })
+    sandbox
+      .stub(Utils, 'getWorkspaceRoot')
+      .returns(vscode.Uri.file('/repo/root/src'))
+
+    await bazelBSPInstaller.install()
+
+    assert.equal(spawnStub.callCount, 1)
+    const commandString = spawnStub.getCalls()[0].args[0]
+    assert.ok(!commandString.includes('--directories "src"'))
+    assert.ok(!commandString.includes('--derive-targets-from-directories'))
+    assert.ok(commandString.includes('--targets "//your/targets/here/..."'))
   })
 
   test('failed coursier download', async () => {
