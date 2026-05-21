@@ -156,7 +156,6 @@ suite('TestInfo', () => {
           }
         }
         assert.deepStrictEqual(result.data, {
-          testFilter: sampleDetails.testFilter,
           coverage: testCase.expectedResult.data.coverage,
         })
       }
