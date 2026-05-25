@@ -7,7 +7,7 @@ import {PythonLanguageTools} from './python'
 import {BaseLanguageTools} from './base'
 import {JavaLanguageTools} from './java'
 import {TypeScriptLanguageTools} from './typescript'
-import {TestCaseInfo} from '../test-info/test-info'
+import type {TestCaseInfo} from '../test-info/test-info'
 
 /**
  * LanguageTools is used to define behavior that should differ based on language.
@@ -23,6 +23,10 @@ export interface LanguageTools {
   mapTestFinishDataToLookupKey(testFinishData: TestFinish): string | undefined
   // Maps test case info into a unique key  that can be used to find an individual test case in a run.
   mapTestCaseInfoToLookupKey(testCaseInfo: TestCaseInfo): string | undefined
+  // Whether source directory runs should be delegated to source files.
+  shouldDeferSourceDirectoryRun(): boolean
+  // Returns a build-server argument that narrows execution to a source file.
+  getTestFileArgument(uri: vscode.Uri | undefined): string | undefined
   getDebugRemoteRoot(
     workspaceRoot: string,
     targetUri: string

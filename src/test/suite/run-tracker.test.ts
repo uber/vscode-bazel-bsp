@@ -201,11 +201,8 @@ suite('Test Run Tracker', () => {
     assert.equal(runSpy.passed.callCount, nonIncludedItems.length)
     nonIncludedItems.forEach(item => assert.ok(remainingItems.has(item)))
 
-    // Since the callback does not update the parents, remaining items marked skipped.
-    assert.equal(
-      runSpy.skipped.callCount,
-      createdTestItems.length - nonIncludedItems.length
-    )
+    // Since the callback does not update the parents, they inherit child status.
+    assert.equal(runSpy.skipped.callCount, 0)
   })
 
   test('filtered pending children', async () => {

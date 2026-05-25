@@ -13,7 +13,10 @@ import {TestItemFactory} from '../../test-info/test-item-factory'
 import * as assert from 'assert'
 import {BuildTarget, SourceItem, SourceItemKind} from '../../bsp/bsp'
 import {TestItemType} from '../../test-info/test-info'
-import {DocumentTestItem} from '../../language-tools/manager'
+import {
+  DocumentTestItem,
+  LanguageToolManager,
+} from '../../language-tools/manager'
 
 suite('Test Item Factory', () => {
   let ctx: vscode.ExtensionContext
@@ -33,7 +36,12 @@ suite('Test Item Factory', () => {
   beforeEach(async () => {
     ctx = {subscriptions: []} as unknown as vscode.ExtensionContext
     const moduleRef = await Test.createTestingModule({
-      providers: [contextProviderFactory(ctx), TestCaseStore, TestItemFactory],
+      providers: [
+        contextProviderFactory(ctx),
+        TestCaseStore,
+        TestItemFactory,
+        LanguageToolManager,
+      ],
     })
       .useMocker(token => {
         if (token === TEST_CONTROLLER_TOKEN) {

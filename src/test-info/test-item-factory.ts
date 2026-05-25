@@ -15,7 +15,7 @@ import {
   TestItemType,
 } from './test-info'
 import {BuildTarget, SourceItem} from '../bsp/bsp'
-import {DocumentTestItem} from '../language-tools/manager'
+import {DocumentTestItem, LanguageToolManager} from '../language-tools/manager'
 
 /**
  * Class which includes various methods to create test items.
@@ -25,6 +25,8 @@ import {DocumentTestItem} from '../language-tools/manager'
 export class TestItemFactory {
   @Inject(EXTENSION_CONTEXT_TOKEN) private readonly ctx: vscode.ExtensionContext
   @Inject(TestCaseStore) private readonly store: TestCaseStore
+  @Inject(LanguageToolManager)
+  private readonly languageToolManager: LanguageToolManager
 
   /**
    * Create a root test item for the test explorer.
@@ -58,7 +60,11 @@ export class TestItemFactory {
       target.displayName ?? target.id.uri,
       uri
     )
-    const testCaseInfo = new BuildTargetTestCaseInfo(newTest, target)
+    const testCaseInfo = new BuildTargetTestCaseInfo(
+      newTest,
+      target,
+      this.languageToolManager.getLanguageTools(target)
+    )
     this.store.testCaseMetadata.set(newTest, testCaseInfo)
 
     newTest.canResolveChildren = true
@@ -87,7 +93,11 @@ export class TestItemFactory {
     )
     this.store.testCaseMetadata.set(
       newTest,
-      new SourceFileTestCaseInfo(newTest, target)
+      new SourceFileTestCaseInfo(
+        newTest,
+        target,
+        this.languageToolManager.getLanguageTools(target)
+      )
     )
 
     return newTest
@@ -177,7 +187,12 @@ export class TestItemFactory {
     newTest.range = details.range
     this.store.testCaseMetadata.set(
       newTest,
-      new TestItemTestCaseInfo(newTest, target, details)
+      new TestItemTestCaseInfo(
+        newTest,
+        target,
+        details,
+        this.languageToolManager.getLanguageTools(target)
+      )
     )
     return newTest
   }
@@ -218,7 +233,12 @@ export class TestItemFactory {
     const newTest = this.store.testController.createTestItem(id, relPath, uri)
     this.store.testCaseMetadata.set(
       newTest,
-      new SourceDirTestCaseInfo(newTest, target, relPath)
+      new SourceDirTestCaseInfo(
+        newTest,
+        target,
+        relPath,
+        this.languageToolManager.getLanguageTools(target)
+      )
     )
     return newTest
   }

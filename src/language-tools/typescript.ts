@@ -8,6 +8,7 @@ import {SourceFileTestCaseInfo, TestCaseInfo} from '../test-info/test-info'
 import {BaseLanguageTools} from './base'
 import {JUnitStyleTestCaseData, TestFinishDataKind} from '../bsp/bsp-ext'
 import * as bsp from '../bsp/bsp'
+import {Utils} from '../utils/utils'
 
 const TEST_FILE_REGEX = /^.+\.(test|spec|browser|node)\.tsx?$/
 
@@ -18,7 +19,25 @@ export class TypeScriptLanguageTools
   isValidTestSource(uri: string): boolean {
     if (uri.includes('node_modules')) return false
     if (uri.includes('bazel-out')) return false
+    // Only expose actual Jest test files, not fixtures/helpers under test dirs.
+    return TEST_FILE_REGEX.test(path.basename(uri))
+  }
+
+  shouldDeferSourceDirectoryRun(): boolean {
     return true
+  }
+
+  getTestFileArgument(uri: vscode.Uri | undefined): string | undefined {
+    if (!uri) {
+      return undefined
+    }
+
+    const workspaceRoot = Utils.getWorkspaceRoot()
+    if (!workspaceRoot) {
+      return undefined
+    }
+
+    return path.relative(workspaceRoot.fsPath, uri.fsPath)
   }
 
   getDebugRemoteRoot(

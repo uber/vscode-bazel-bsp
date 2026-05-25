@@ -3,8 +3,7 @@ import * as path from 'path'
 import {BuildTarget, TestParams, TestResult, StatusCode} from '../bsp/bsp'
 import {TestParamsDataKind, BazelTestParamsData} from '../bsp/bsp-ext'
 import {TestCaseStatus, TestRunTracker} from '../test-runner/run-tracker'
-import {DocumentTestItem, LanguageToolManager} from '../language-tools/manager'
-import {getExtensionSetting, SettingName} from '../utils/settings'
+import type {DocumentTestItem, LanguageTools} from '../language-tools/manager'
 
 export enum TestItemType {
   Root,
@@ -99,12 +98,18 @@ export class TargetDirTestCaseInfo extends TestCaseInfo {
 export class BuildTargetTestCaseInfo extends TestCaseInfo {
   public readonly type: TestItemType
   public readonly target: BuildTarget
+  protected readonly languageTools: LanguageTools | undefined
 
-  constructor(test: vscode.TestItem, target: BuildTarget) {
+  constructor(
+    test: vscode.TestItem,
+    target: BuildTarget,
+    languageTools?: LanguageTools
+  ) {
     super(test, target)
     this.type = TestItemType.BazelTarget
     // This class and any that extend it are guaranteed to include a target.
     this.target = target
+    this.languageTools = languageTools
   }
 
   prepareTestRunParams(currentRun: TestRunTracker): TestParams | undefined {
@@ -194,10 +199,23 @@ export class BuildTargetTestCaseInfo extends TestCaseInfo {
 export class SourceDirTestCaseInfo extends BuildTargetTestCaseInfo {
   public readonly type: TestItemType
   private readonly dir: string
-  constructor(test: vscode.TestItem, target: BuildTarget, dir: string) {
-    super(test, target)
+  constructor(
+    test: vscode.TestItem,
+    target: BuildTarget,
+    dir: string,
+    languageTools?: LanguageTools
+  ) {
+    super(test, target, languageTools)
     this.dir = dir
     this.type = TestItemType.SourceDirectory
+  }
+
+  prepareTestRunParams(currentRun: TestRunTracker): TestParams | undefined {
+    if (this.languageTools?.shouldDeferSourceDirectoryRun()) {
+      return
+    }
+
+    return super.prepareTestRunParams(currentRun)
   }
 
   /**
@@ -224,8 +242,12 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
   public readonly type: TestItemType
   protected details: DocumentTestItem | undefined
 
-  constructor(test: vscode.TestItem, target: BuildTarget) {
-    super(test, target)
+  constructor(
+    test: vscode.TestItem,
+    target: BuildTarget,
+    languageTools?: LanguageTools
+  ) {
+    super(test, target, languageTools)
     this.type = TestItemType.SourceFile
   }
 
@@ -233,8 +255,15 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
     if (this.target === undefined) return
 
     const params = super.prepareTestRunParams(currentRun)
+
+    const fileArgument = this.getTestFileArgument()
+    if (fileArgument) {
+      params?.arguments?.push(fileArgument)
+    }
+
     if (
       params?.dataKind === TestParamsDataKind.BazelTest &&
+      this.type === TestItemType.TestCase &&
       this.details?.testFilter
     ) {
       const bazelParams = params.data as BazelTestParamsData
@@ -242,6 +271,26 @@ export class SourceFileTestCaseInfo extends BuildTargetTestCaseInfo {
     }
 
     return params
+  }
+
+  processTestRunResult(currentRun: TestRunTracker, result: TestResult): void {
+    updateStatus(this.testItem, currentRun, result)
+
+    for (const child of currentRun.pendingChildrenIterator(
+      this.testItem,
+      TestItemType.SourceFile
+    )) {
+      if (result.statusCode === StatusCode.Ok) {
+        currentRun.updateStatus(child.testItem, TestCaseStatus.Passed)
+      } else if (child.testItem.children.size > 0) {
+        currentRun.updateStatus(child.testItem, TestCaseStatus.Inherit)
+      }
+    }
+  }
+
+  private getTestFileArgument(): string | undefined {
+    const uri = this.details?.uri ?? this.testItem.uri
+    return this.languageTools?.getTestFileArgument(uri)
   }
 
   /**
@@ -282,11 +331,34 @@ export class TestItemTestCaseInfo extends SourceFileTestCaseInfo {
   constructor(
     test: vscode.TestItem,
     target: BuildTarget,
-    details: DocumentTestItem
+    details: DocumentTestItem,
+    languageTools?: LanguageTools
   ) {
-    super(test, target)
+    super(test, target, languageTools)
     this.type = TestItemType.TestCase
     this.details = details
+  }
+
+  processTestRunResult(currentRun: TestRunTracker, result: TestResult): void {
+    if (
+      result.statusCode === StatusCode.Error &&
+      this.testItem.children.size > 0
+    ) {
+      currentRun.updateStatus(this.testItem, TestCaseStatus.Inherit)
+
+      for (const child of currentRun.pendingChildrenIterator(
+        this.testItem,
+        TestItemType.SourceFile
+      )) {
+        if (child.testItem.children.size > 0) {
+          currentRun.updateStatus(child.testItem, TestCaseStatus.Inherit)
+        }
+      }
+
+      return
+    }
+
+    super.processTestRunResult(currentRun, result)
   }
 
   /**

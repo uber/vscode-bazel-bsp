@@ -15,6 +15,8 @@ import {TestCaseStatus, TestRunTracker} from '../../test-runner/run-tracker'
 import {beforeEach, afterEach} from 'mocha'
 import {TestParamsDataKind} from '../../bsp/bsp-ext'
 import {DocumentTestItem} from '../../language-tools/manager'
+import {Utils} from '../../utils/utils'
+import {TypeScriptLanguageTools} from '../../language-tools/typescript'
 
 suite('TestInfo', () => {
   const sampleTarget: BuildTarget = {
@@ -23,6 +25,10 @@ suite('TestInfo', () => {
     languageIds: [],
     dependencies: [],
     capabilities: {},
+  }
+  const sampleTypeScriptTarget: BuildTarget = {
+    ...sampleTarget,
+    languageIds: ['typescript'],
   }
 
   let testController: vscode.TestController
@@ -91,7 +97,7 @@ suite('TestInfo', () => {
       }
     })
 
-    test('source directory', async () => {
+    test('non-typescript source directory runs target directly', async () => {
       const testItem = testController.createTestItem('sample', 'sample')
       const testInfo = new SourceDirTestCaseInfo(
         testItem,
@@ -105,6 +111,19 @@ suite('TestInfo', () => {
         const result = testInfo.prepareTestRunParams(currentRun)
         assert.deepStrictEqual(result, testCase.expectedResult)
       }
+    })
+
+    test('typescript source directory defers to source file runs', async () => {
+      const testItem = testController.createTestItem('sample', 'sample')
+      const testInfo = new SourceDirTestCaseInfo(
+        testItem,
+        sampleTypeScriptTarget,
+        '/sample/dir',
+        new TypeScriptLanguageTools()
+      )
+      const currentRun = sandbox.createStubInstance(TestRunTracker)
+      const result = testInfo.prepareTestRunParams(currentRun)
+      assert.equal(result, undefined)
     })
 
     test('source file', async () => {
@@ -137,10 +156,71 @@ suite('TestInfo', () => {
           }
         }
         assert.deepStrictEqual(result.data, {
-          testFilter: sampleDetails.testFilter,
           coverage: testCase.expectedResult.data.coverage,
         })
       }
+    })
+
+    test('typescript source file adds file argument', async () => {
+      sandbox
+        .stub(Utils, 'getWorkspaceRoot')
+        .returns(vscode.Uri.file('/sample'))
+
+      const testItem = testController.createTestItem('sample', 'sample')
+      const sampleDetails: DocumentTestItem = {
+        uri: vscode.Uri.file('/sample/src/example/__tests__/sample.browser.ts'),
+        name: 'sample.browser.ts',
+        parent: undefined,
+        range: new vscode.Range(0, 0, 0, 0),
+        testFilter: '',
+      }
+
+      const testInfo = new SourceFileTestCaseInfo(
+        testItem,
+        sampleTypeScriptTarget,
+        new TypeScriptLanguageTools()
+      )
+      testInfo.setDocumentTestItem(sampleDetails)
+
+      const currentRun = sandbox.createStubInstance(TestRunTracker)
+      sandbox.stub(currentRun, 'originName').get(() => 'sample')
+      currentRun.getRunProfileKind.returns(vscode.TestRunProfileKind.Run)
+
+      const result = testInfo.prepareTestRunParams(currentRun)
+      assert.ok(result)
+      assert.deepStrictEqual(result.arguments, [
+        'src/example/__tests__/sample.browser.ts',
+      ])
+      assert.deepStrictEqual(result.data, {
+        coverage: false,
+      })
+    })
+
+    test('typescript source file adds file argument before test case analysis', async () => {
+      sandbox
+        .stub(Utils, 'getWorkspaceRoot')
+        .returns(vscode.Uri.file('/sample'))
+
+      const testItem = testController.createTestItem(
+        'sample',
+        'sample',
+        vscode.Uri.file('/sample/src/example/__tests__/sample.browser.ts')
+      )
+      const testInfo = new SourceFileTestCaseInfo(
+        testItem,
+        sampleTypeScriptTarget,
+        new TypeScriptLanguageTools()
+      )
+
+      const currentRun = sandbox.createStubInstance(TestRunTracker)
+      sandbox.stub(currentRun, 'originName').get(() => 'sample')
+      currentRun.getRunProfileKind.returns(vscode.TestRunProfileKind.Run)
+
+      const result = testInfo.prepareTestRunParams(currentRun)
+      assert.ok(result)
+      assert.deepStrictEqual(result.arguments, [
+        'src/example/__tests__/sample.browser.ts',
+      ])
     })
 
     test('test case', async () => {
@@ -178,6 +258,41 @@ suite('TestInfo', () => {
           coverage: testCase.expectedResult.data.coverage,
         })
       }
+    })
+
+    test('typescript test case adds file argument and test filter', async () => {
+      sandbox
+        .stub(Utils, 'getWorkspaceRoot')
+        .returns(vscode.Uri.file('/sample'))
+
+      const testItem = testController.createTestItem('sample', 'sample')
+      const sampleDetails: DocumentTestItem = {
+        uri: vscode.Uri.file('/sample/src/example/__tests__/sample.browser.ts'),
+        name: 'renders selected state',
+        parent: undefined,
+        range: new vscode.Range(0, 0, 0, 0),
+        testFilter: 'renders selected state',
+      }
+
+      const testInfo = new TestItemTestCaseInfo(
+        testItem,
+        sampleTypeScriptTarget,
+        sampleDetails,
+        new TypeScriptLanguageTools()
+      )
+      const currentRun = sandbox.createStubInstance(TestRunTracker)
+      sandbox.stub(currentRun, 'originName').get(() => 'sample')
+      currentRun.getRunProfileKind.returns(vscode.TestRunProfileKind.Run)
+
+      const result = testInfo.prepareTestRunParams(currentRun)
+      assert.ok(result)
+      assert.deepStrictEqual(result.arguments, [
+        'src/example/__tests__/sample.browser.ts',
+      ])
+      assert.deepStrictEqual(result.data, {
+        testFilter: sampleDetails.testFilter,
+        coverage: false,
+      })
     })
 
     test('root', async () => {
@@ -373,6 +488,173 @@ suite('TestInfo', () => {
           TestItemType.BazelTarget
         )
       )
+    })
+
+    test('ok result, source file marks pending children passed', async () => {
+      const childItem = testController.createTestItem('child', 'child')
+      const childInfo = new TestItemTestCaseInfo(
+        childItem,
+        sampleTypeScriptTarget,
+        {
+          uri: vscode.Uri.file(
+            '/sample/src/example/__tests__/sample.browser.ts'
+          ),
+          name: 'child',
+          parent: undefined,
+          range: new vscode.Range(0, 0, 0, 0),
+          testFilter: 'child',
+        }
+      )
+      currentRun.pendingChildrenIterator.returns(
+        (function* () {
+          yield childInfo
+        })()
+      )
+
+      const testInfo = new SourceFileTestCaseInfo(
+        testItem,
+        sampleTypeScriptTarget
+      )
+      const bspResult: TestResult = {
+        statusCode: StatusCode.Ok,
+        originId: 'sample',
+      }
+
+      testInfo.processTestRunResult(currentRun, bspResult)
+
+      assert.ok(
+        currentRun.updateStatus.calledWithExactly(
+          testItem,
+          TestCaseStatus.Passed
+        )
+      )
+      assert.ok(
+        currentRun.updateStatus.calledWithExactly(
+          childItem,
+          TestCaseStatus.Passed
+        )
+      )
+      assert.ok(
+        currentRun.pendingChildrenIterator.calledOnceWithExactly(
+          testItem,
+          TestItemType.SourceFile
+        )
+      )
+    })
+
+    test('error result, source file clears containers and leaves leaf tests for server-reported statuses', async () => {
+      const suiteItem = testController.createTestItem('suite', 'suite')
+      const childItem = testController.createTestItem('child', 'child')
+      suiteItem.children.add(childItem)
+      const suiteInfo = new TestItemTestCaseInfo(
+        suiteItem,
+        sampleTypeScriptTarget,
+        {
+          uri: vscode.Uri.file(
+            '/sample/src/example/__tests__/sample.browser.ts'
+          ),
+          name: 'suite',
+          parent: undefined,
+          range: new vscode.Range(0, 0, 0, 0),
+          testFilter: 'suite',
+        },
+        new TypeScriptLanguageTools()
+      )
+      const childInfo = new TestItemTestCaseInfo(
+        childItem,
+        sampleTypeScriptTarget,
+        {
+          uri: vscode.Uri.file(
+            '/sample/src/example/__tests__/sample.browser.ts'
+          ),
+          name: 'child',
+          parent: undefined,
+          range: new vscode.Range(0, 0, 0, 0),
+          testFilter: 'child',
+        },
+        new TypeScriptLanguageTools()
+      )
+      currentRun.pendingChildrenIterator.returns(
+        (function* () {
+          yield suiteInfo
+          yield childInfo
+        })()
+      )
+
+      const testInfo = new SourceFileTestCaseInfo(
+        testItem,
+        sampleTypeScriptTarget
+      )
+      const bspResult: TestResult = {
+        statusCode: StatusCode.Error,
+        originId: 'sample',
+        data: {
+          stdoutCollector: {lines: ['FAIL: //sample:test']},
+        },
+      }
+
+      testInfo.processTestRunResult(currentRun, bspResult)
+
+      assert.ok(
+        currentRun.updateStatus.calledWith(suiteItem, TestCaseStatus.Inherit)
+      )
+      assert.ok(currentRun.updateStatus.neverCalledWith(childItem))
+    })
+
+    test('error result, test suite inherits child statuses instead of aggregate target failure', async () => {
+      const childItem = testController.createTestItem('child', 'child')
+      testItem.children.add(childItem)
+      const childInfo = new TestItemTestCaseInfo(
+        childItem,
+        sampleTypeScriptTarget,
+        {
+          uri: vscode.Uri.file(
+            '/sample/src/example/__tests__/sample.browser.ts'
+          ),
+          name: 'child',
+          parent: undefined,
+          range: new vscode.Range(0, 0, 0, 0),
+          testFilter: 'child',
+        },
+        new TypeScriptLanguageTools()
+      )
+      currentRun.pendingChildrenIterator.returns(
+        (function* () {
+          yield childInfo
+        })()
+      )
+
+      const testInfo = new TestItemTestCaseInfo(
+        testItem,
+        sampleTypeScriptTarget,
+        {
+          uri: vscode.Uri.file(
+            '/sample/src/example/__tests__/sample.browser.ts'
+          ),
+          name: 'suite',
+          parent: undefined,
+          range: new vscode.Range(0, 0, 0, 0),
+          testFilter: 'suite',
+        },
+        new TypeScriptLanguageTools()
+      )
+      const bspResult: TestResult = {
+        statusCode: StatusCode.Error,
+        originId: 'sample',
+        data: {
+          stdoutCollector: {lines: ['FAIL: //sample:test']},
+        },
+      }
+
+      testInfo.processTestRunResult(currentRun, bspResult)
+
+      assert.ok(
+        currentRun.updateStatus.calledOnceWithExactly(
+          testItem,
+          TestCaseStatus.Inherit
+        )
+      )
+      assert.ok(currentRun.updateStatus.neverCalledWith(childItem))
     })
 
     test('error result', async () => {
